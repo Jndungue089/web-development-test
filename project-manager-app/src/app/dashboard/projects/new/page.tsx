@@ -40,56 +40,98 @@ export default function CreateProjectPage() {
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gray-100">
-      <form onSubmit={handleSubmit} className="bg-white p-6 rounded-lg shadow-md w-full max-w-md">
-        <h2 className="text-2xl font-bold mb-6 text-center">Novo Projeto</h2>
-        <div className="space-y-4">
+    <form
+      onSubmit={handleSubmit}
+      className="w-full max-w-md bg-white p-6 md:p-8 rounded-2xl shadow-lg border justify-center items-center border-gray-200"
+      aria-labelledby="form-title"
+    >
+      <h1 id="form-title" className="text-2xl font-bold text-center text-primary mb-6">
+        Criar Novo Projeto
+      </h1>
+
+      <div className="space-y-5">
+        <div>
+          <label htmlFor="title" className="block text-sm font-medium text-gray-700">
+            Título do Projeto <span className="text-red-500">*</span>
+          </label>
           <input
+            id="title"
             type="text"
-            placeholder="Título"
+            required
             value={title}
             onChange={(e) => setTitle(e.target.value)}
-            className="w-full p-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-            required
+            className="mt-1 w-full rounded-lg border-gray-300 shadow-sm focus:ring-2 focus:ring-primary focus:outline-none p-3"
+            placeholder="Ex: Sistema de Gestão de Tarefas"
           />
+        </div>
+
+        <div>
+          <label htmlFor="description" className="block text-sm font-medium text-gray-700">
+            Descrição
+          </label>
           <textarea
-            placeholder="Descrição"
+            id="description"
             value={description}
             onChange={(e) => setDescription(e.target.value)}
-            className="w-full p-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
             rows={4}
+            className="mt-1 w-full rounded-lg border-gray-300 shadow-sm focus:ring-2 focus:ring-primary focus:outline-none p-3"
+            placeholder="Descreva brevemente o projeto"
           />
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div>
+            <label htmlFor="startDate" className="block text-sm font-medium text-gray-700">
+              Início
+            </label>
+            <input
+              id="startDate"
+              type="date"
+              value={startDate}
+              onChange={(e) => setStartDate(e.target.value)}
+              className="mt-1 w-full rounded-lg border-gray-300 shadow-sm focus:ring-2 focus:ring-primary focus:outline-none p-3"
+            />
+          </div>
+
+          <div>
+            <label htmlFor="endDate" className="block text-sm font-medium text-gray-700">
+              Conclusão
+            </label>
+            <input
+              id="endDate"
+              type="date"
+              value={endDate}
+              onChange={(e) => setEndDate(e.target.value)}
+              className="mt-1 w-full rounded-lg border-gray-300 shadow-sm focus:ring-2 focus:ring-primary focus:outline-none p-3"
+            />
+          </div>
+        </div>
+
+        <div>
+          <label htmlFor="members" className="block text-sm font-medium text-gray-700">
+            Membros
+          </label>
           <input
-            type="date"
-            value={startDate}
-            onChange={(e) => setStartDate(e.target.value)}
-            className="w-full p-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-            placeholder="Data de Início"
-          />
-          <input
-            type="date"
-            value={endDate}
-            onChange={(e) => setEndDate(e.target.value)}
-            className="w-full p-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-            placeholder="Data de Conclusão"
-          />
-          <input
+            id="members"
             type="text"
-            placeholder="Membros (separe por vírgulas, ex: João, Maria)"
             value={members}
             onChange={(e) => setMembers(e.target.value)}
-            className="w-full p-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+            placeholder="Ex: João, Maria"
+            className="mt-1 w-full rounded-lg border-gray-300 shadow-sm focus:ring-2 focus:ring-primary focus:outline-none p-3"
           />
-          {error && <div className="text-red-500 text-sm">{error}</div>}
-          <button
-            type="submit"
-            className="w-full bg-blue-600 text-white py-3 rounded-lg hover:bg-blue-700 transition-all disabled:bg-blue-400"
-            disabled={loading}
-          >
-            {loading ? "Salvando..." : "Criar Projeto"}
-          </button>
+          <p className="text-xs text-gray-500 mt-1">Separe os nomes por vírgulas</p>
         </div>
-      </form>
-    </div>
+
+        {error && <p className="text-red-600 text-sm">{error}</p>}
+
+        <button
+          type="submit"
+          disabled={loading}
+          className="w-full py-3 rounded-lg text-white font-semibold transition-all bg-primary hover:bg-primary-dark disabled:bg-gray-300"
+        >
+          {loading ? "Salvando..." : "Criar Projeto"}
+        </button>
+      </div>
+    </form>
   );
 }
