@@ -5,15 +5,54 @@ import { useRouter } from "next/navigation";
 import { useAuthState } from "react-firebase-hooks/auth";
 import { auth } from "@/firebase/config";
 import { motion, AnimatePresence, easeInOut } from "framer-motion"; // Imported easeInOut
-import { collection, onSnapshot, query, where, doc, updateDoc } from "firebase/firestore";
+import { collection, onSnapshot, query, where, doc, updateDoc, getDoc } from "firebase/firestore";
 import { db } from "@/firebase/config"; // Ensure this is set up to export Firestore instance
+import { onAuthStateChanged } from "@firebase/auth";
+import { FiGrid, FiMoon, FiSun } from "react-icons/fi";
 
 export default function Header({ onUserMenu }: { onUserMenu?: () => void }) {
   const [dropdown, setDropdown] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
+  const [userData, setUserData] = useState<{ name: string; email: string } | null>(null);
   const [user] = useAuthState(auth);
+  const [darkMode, setDarkMode] = useState(false);
   const router = useRouter();
   const dropdownRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      if (user) {
+        const userDoc = await getDoc(doc(db, "users", user.uid));
+        if (userDoc.exists()) {
+          setUserData({
+            name: userDoc.data().name || user.displayName || "Usuário",
+            email: user.email || "",
+          });
+        }
+      } else {
+        setUserData(null);
+      }
+    });
+
+    // Verifica tema salvo
+    const savedTheme = localStorage.getItem("theme");
+    setDarkMode(savedTheme === "dark");
+
+    return () => unsubscribe();
+  }, []);
+
+  // Alternar tema
+  const toggleTheme = () => {
+    const newTheme = !darkMode ? "dark" : "light";
+    localStorage.setItem("theme", newTheme);
+    document.documentElement.classList.toggle("dark", !darkMode);
+    setDarkMode(!darkMode);
+  };
+
+  // Navegação
+  const navigate = (path: string) => {
+    router.push(path);
+  };
 
   // Handle click outside to close dropdown
   useEffect(() => {
@@ -57,17 +96,36 @@ export default function Header({ onUserMenu }: { onUserMenu?: () => void }) {
   return (
     <header className="w-full px-6 py-4 bg-gradient-to-r from-blue-600 to-indigo-700 text-white shadow-lg mb-6 relative">
       <div className="absolute inset-0 bg-[url('data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' viewBox=\'0 0 1440 320\'%3E%3Cpath fill=\'%23000022\' fill-opacity=\'0.1\' d=\'M0,64L48,80C96,96,192,128,288,128C384,128,480,96,576,85.3C672,75,768,85,864,106.7C960,128,1056,160,1152,176C1248,192,1344,192,1392,192L1440,192V320H1392C1344,320,1248,320,1152,320C1056,320,960,320,864,320C768,320,672,320,576,320C480,320,384,320,288,320C192,320,96,320,48,320H0V64Z\'/%3E%3C/svg%3E')] opacity-50 pointer-events-none" />
-      
+
       <div className="relative z-10 flex items-center justify-between">
-        <motion.div
-          initial={{ x: -20, opacity: 0 }}
-          animate={{ x: 0, opacity: 1 }}
-          transition={{ duration: 0.5, ease: easeInOut }}
-          className="text-2xl font-bold tracking-tight"
+        {/* Logo */}
+        <div
+          onClick={() => navigate("/dashboard")}
+          className="flex items-center cursor-pointer"
         >
-          Project Manager
-        </motion.div>
+          <motion.div
+            whileHover={{ scale: 1.05 }}
+            className="flex items-center space-x-2"
+          >
+            <div className="w-8 h-8 rounded-md bg-gradient-to-r from-blue-600 to-blue-400 flex items-center justify-center">
+              <FiGrid className="text-white" size={16} />
+            </div>
+            <span className="text-xl font-bold text-gray-800 dark:text-white">
+              PMS
+            </span>
+          </motion.div>
+        </div>
         <div className="flex items-center gap-6">
+          {/* Botão de Tema */}
+          <motion.button
+            whileHover={{ scale: 1.1 }}
+            whileTap={{ scale: 0.9 }}
+            onClick={toggleTheme}
+            className="p-2 rounded-full bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300"
+            aria-label="Alternar tema"
+          >
+            {darkMode ? <FiSun size={18} /> : <FiMoon size={18} />}
+          </motion.button>
           <motion.div
             whileHover={{ scale: 1.1, rotate: 5 }}
             whileTap={{ scale: 0.95 }}
@@ -106,7 +164,7 @@ export default function Header({ onUserMenu }: { onUserMenu?: () => void }) {
               onClick={() => setDropdown((d) => !d)}
             >
               <User className="w-7 h-7 text-white" />
-              <span className="font-medium text-white hidden sm:block">{user?.displayName || user?.email?.split("@")[0] || "Usuário"}</span>
+              <span className="font-medium text-white hidden sm:block">{userData?.name || "Usuário"}</span>
             </motion.button>
             <AnimatePresence>
               {dropdown && (
@@ -125,7 +183,7 @@ export default function Header({ onUserMenu }: { onUserMenu?: () => void }) {
                   >
                     <User className="w-8 h-8 text-gray-500" />
                   </motion.div>
-                  <div className="font-semibold text-lg mb-1">{user?.displayName || user?.email?.split("@")[0] || "Usuário"}</div>
+                  <div className="font-semibold text-lg mb-1">{userData?.name || "Usuário"}</div>
                   <div className="text-gray-500 text-sm mb-3">{user?.email || "Nenhum email"}</div>
                   <button
                     className="w-full text-left px-3 py-2 hover:bg-gray-100 rounded flex items-center gap-2 transition-colors duration-200"

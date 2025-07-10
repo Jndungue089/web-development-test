@@ -85,8 +85,8 @@ export function Navbar() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between h-16 items-center">
           {/* Logo */}
-          <div 
-            onClick={() => navigate("/")} 
+          <div
+            onClick={() => navigate("/")}
             className="flex items-center cursor-pointer"
           >
             <motion.div
@@ -110,11 +110,10 @@ export function Navbar() {
                 whileHover={{ y: -2 }}
                 whileTap={{ scale: 0.95 }}
                 onClick={() => navigate(item.path)}
-                className={`flex items-center px-3 py-2 rounded-lg transition-all ${
-                  activeTab === item.id
-                    ? "text-blue-600 dark:text-blue-400 font-medium"
-                    : "text-gray-600 dark:text-gray-400 hover:text-blue-500 dark:hover:text-blue-300"
-                }`}
+                className={`flex items-center px-3 py-2 rounded-lg transition-all ${activeTab === item.id
+                  ? "text-blue-600 dark:text-blue-400 font-medium"
+                  : "text-gray-600 dark:text-gray-400 hover:text-blue-500 dark:hover:text-blue-300"
+                  }`}
               >
                 {item.icon}
                 <span className="ml-2">{item.label}</span>
