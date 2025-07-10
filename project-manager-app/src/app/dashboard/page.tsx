@@ -8,6 +8,10 @@ import { toast } from "sonner";
 import { motion, AnimatePresence } from "framer-motion";
 import { FiPlus, FiMoreVertical, FiCheck, FiClock, FiPlay, FiArchive, FiPieChart, FiTrendingUp, FiAlertTriangle } from "react-icons/fi";
 import Link from "next/link";
+import { Chart as ChartJS, ArcElement, BarElement, CategoryScale, LinearScale, Tooltip, Legend } from "chart.js";
+import { Pie, Bar } from "react-chartjs-2";
+
+ChartJS.register(ArcElement, BarElement, CategoryScale, LinearScale, Tooltip, Legend);
 
 // Tipos para o projeto
 type Project = {
@@ -48,8 +52,9 @@ const StatCard = ({ icon, title, value, trend, color }: { icon: React.ReactNode;
     )}
   </motion.div>
 );
+
 // Componente: Card de Projeto Draggable
-const ProjectCard = ({ project, moveProject }: { project: Project; moveProject: (id: string, newStatus: Project["status"]) => void }) => {
+const ProjectCard = ({ project, moveProject, updatePriority }: { project: Project; moveProject: (id: string, newStatus: Project["status"]) => void; updatePriority: (id: string, newPriority: Project["priority"]) => void }) => {
   const [{ isDragging }, drag] = useDrag(() => ({
     type: "PROJECT",
     item: { id: project.id, status: project.status },
@@ -59,12 +64,21 @@ const ProjectCard = ({ project, moveProject }: { project: Project; moveProject: 
   }));
 
   const ref = useRef<HTMLDivElement>(null);
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+
   drag(ref);
 
   const priorityColors = {
     low: "bg-green-100 text-green-800",
     medium: "bg-yellow-100 text-yellow-800",
     high: "bg-red-100 text-red-800",
+  };
+
+  const handlePriorityChange = async (newPriority: Project["priority"]) => {
+    if (newPriority && newPriority !== project.priority) {
+      await updatePriority(project.id, newPriority);
+      setIsDropdownOpen(false);
+    }
   };
 
   return (
@@ -103,9 +117,29 @@ const ProjectCard = ({ project, moveProject }: { project: Project; moveProject: 
             month: "short",
           })}
         </span>
-        <button className="opacity-0 group-hover:opacity-100 transition-opacity text-gray-400 hover:text-gray-600 dark:hover:text-gray-300">
-          <FiMoreVertical size={16} />
-        </button>
+        <div className="relative">
+          <button
+            onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+            className="opacity-0 group-hover:opacity-100 transition-opacity text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+          >
+            <FiMoreVertical size={16} />
+          </button>
+          {isDropdownOpen && (
+            <div className="absolute right-0 mt-2 w-32 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-md shadow-lg z-10">
+              <div className="py-1">
+                {["low", "medium", "high"].map((priority) => (
+                  <button
+                    key={priority}
+                    onClick={() => handlePriorityChange(priority as Project["priority"])}
+                    className="block w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700"
+                  >
+                    {priority === "high" ? "Alta" : priority === "medium" ? "Média" : "Baixa"}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
       </div>
     </motion.div>
   );
@@ -116,10 +150,12 @@ const ProjectColumn = ({
   status,
   projects,
   moveProject,
+  updatePriority,
 }: {
   status: Project["status"];
   projects: Project[];
   moveProject: (id: string, newStatus: Project["status"]) => void;
+  updatePriority: (id: string, newPriority: Project["priority"]) => void;
 }) => {
   const [{ isOver }, drop] = useDrop(() => ({
     accept: "PROJECT",
@@ -143,7 +179,6 @@ const ProjectColumn = ({
   };
 
   const filteredProjects = projects.filter((p) => p.status === status);
-
   const count = filteredProjects.length;
 
   return (
@@ -152,34 +187,31 @@ const ProjectColumn = ({
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.3 }}
-      className={`flex-1 rounded-xl p-4 transition-colors ${isOver ? "bg-gray-100/50 dark:bg-gray-700/50" : ""
-        }`}
+      className={`flex-1 rounded-xl p-4 transition-colors ${isOver ? "bg-gray-100/50 dark:bg-gray-700/50" : ""}`}
     >
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center space-x-2">
           <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${statusConfig[status].color}`}>
             {statusConfig[status].icon}
           </div>
-          <h2 className="font-semibold text-gray-900 dark:text-white">
-            {statusConfig[status].title}
-          </h2>
+          <h2 className="font-semibold text-gray-900 dark:text-white">{statusConfig[status].title}</h2>
         </div>
-        <span className="text-xs font-medium px-2 py-1 rounded-full bg-gray-200 dark:bg-gray-700">
-          {count}
-        </span>
+        <span className="text-xs font-medium px-2 py-1 rounded-full bg-gray-200 dark:bg-gray-700">{count}</span>
       </div>
 
-      <motion.div
-        layout
-        className="space-y-3 min-h-[100px]"
-      >
+      <motion.div layout className="space-y-3 min-h-[100px]">
         <AnimatePresence>
           {filteredProjects.map((project) => (
-            <ProjectCard 
-              key={project.id} 
-              project={project} 
-              moveProject={moveProject} 
-            />
+            <motion.div
+              key={project.id}
+              layout
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ type: "spring", stiffness: 500, damping: 30 }}
+            >
+              <ProjectCard project={project} moveProject={moveProject} updatePriority={updatePriority} />
+            </motion.div>
           ))}
         </AnimatePresence>
 
@@ -190,9 +222,7 @@ const ProjectColumn = ({
             className="flex flex-col items-center justify-center py-8 text-center"
           >
             <FiArchive className="text-gray-400 mb-2" size={24} />
-            <p className="text-sm text-gray-500 dark:text-gray-400">
-              Nenhum projeto nesta coluna
-            </p>
+            <p className="text-sm text-gray-500 dark:text-gray-400">Nenhum projeto nesta coluna</p>
           </motion.div>
         )}
       </motion.div>
@@ -208,15 +238,22 @@ export default function DashboardPage() {
     const unsubscribe = onSnapshot(collection(db, "projects"), (snapshot) => {
       const projectsData = snapshot.docs.map((doc) => {
         const data = doc.data();
+        const validStatus = ["TO_DO", "IN_PROGRESS", "DONE"].includes(data.status) ? data.status : "TO_DO";
+        // Convert string dates to Date objects
+        const parseDate = (date: any): Date | undefined => {
+          if (date instanceof Timestamp) return date.toDate();
+          if (typeof date === "string" && date) return new Date(date);
+          return undefined;
+        };
         return {
           id: doc.id,
           title: data.title || "",
           description: data.description || "",
-          status: data.status || "TO_DO",
-          priority: data.priority || "medium",
-          createdAt: data.createdAt instanceof Timestamp ? data.createdAt.toDate() : data.createdAt || undefined,
-          startDate: data.startDate instanceof Timestamp ? data.startDate.toDate() : data.startDate || undefined,
-          endDate: data.endDate instanceof Timestamp ? data.endDate.toDate() : data.endDate || undefined,
+          status: validStatus as Project["status"],
+          priority: ["low", "medium", "high"].includes(data.priority) ? data.priority : "medium",
+          createdAt: parseDate(data.createdAt),
+          startDate: parseDate(data.startDate),
+          endDate: parseDate(data.endDate),
         };
       });
       setProjects(projectsData);
@@ -237,22 +274,50 @@ export default function DashboardPage() {
     }
   };
 
+  const updatePriority = async (id: string, newPriority: Project["priority"]) => {
+    try {
+      const projectRef = doc(db, "projects", id);
+      await updateDoc(projectRef, { priority: newPriority });
+      toast.success(`Prioridade atualizada para ${newPriority === "high" ? "Alta" : newPriority === "medium" ? "Média" : "Baixa"}`);
+    } catch (error) {
+      toast.error("Erro ao atualizar prioridade");
+      console.error("Error updating priority:", error);
+    }
+  };
+
   // Calcular estatísticas
   const stats = {
     totalProjects: projects.length,
-    completed: projects.filter(p => p.status === "DONE").length,
-    inProgress: projects.filter(p => p.status === "IN_PROGRESS").length,
-    overdue: projects.filter(p => {
+    completed: projects.filter((p) => p.status === "DONE").length,
+    inProgress: projects.filter((p) => p.status === "IN_PROGRESS").length,
+    overdue: projects.filter((p) => {
       if (p.status !== "DONE" && p.endDate) {
-        return new Date() > new Date(p.endDate);
+        return new Date() > p.endDate;
       }
       return false;
     }).length,
-    completionRate: projects.length > 0
-      ? Math.round((projects.filter(p => p.status === "DONE").length / projects.length) * 100)
-      : 0,
-    highPriority: projects.filter(p => p.priority === "high").length,
+    completionRate: projects.length > 0 ? Math.round((projects.filter((p) => p.status === "DONE").length / projects.length) * 100) : 0,
+    highPriority: projects.filter((p) => p.priority === "high").length,
   };
+
+  // Dados para o gráfico de Progresso Mensal
+  const monthlyData = Array(6)
+    .fill(0)
+    .map((_, i) => {
+      const date = new Date();
+      date.setMonth(date.getMonth() - (5 - i));
+      return {
+        month: date.toLocaleString("pt-BR", { month: "short" }),
+        completed: projects.filter((p) => {
+          if (p.status === "DONE" && p.endDate instanceof Date && !isNaN(p.endDate.getTime())) {
+            const endMonth = p.endDate.getMonth();
+            const endYear = p.endDate.getFullYear();
+            return endMonth === date.getMonth() && endYear === date.getFullYear();
+          }
+          return false;
+        }).length,
+      };
+    });
 
   if (loading) {
     return (
@@ -284,11 +349,7 @@ export default function DashboardPage() {
         </div>
 
         {/* Seção de Estatísticas */}
-        <motion.section
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 0.2 }}
-        >
+        <motion.section initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.2 }}>
           <h2 className="text-xl font-semibold mb-4 dark:text-white">Visão Geral</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
             <StatCard
@@ -318,42 +379,80 @@ export default function DashboardPage() {
             />
           </div>
 
-          {/* Gráficos adicionais (pode ser implementado com Chart.js ou outra biblioteca) */}
+          {/* Gráficos */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-8">
             <div className="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-sm border border-gray-200 dark:border-gray-700">
               <h3 className="font-medium mb-3 dark:text-white">Distribuição por Status</h3>
-              <div className="h-64 flex items-center justify-center">
-                {/* Espaço reservado para gráfico de pizza */}
-                <div className="text-center text-gray-400">
-                  <FiPieChart size={48} className="mx-auto mb-2" />
-                  <p>Gráfico de distribuição por status</p>
-                </div>
+              <div className="h-64">
+                <Pie
+                  data={{
+                    labels: ["Por Fazer", "Em Progresso", "Concluído"],
+                    datasets: [
+                      {
+                        data: [
+                          projects.filter((p) => p.status === "TO_DO").length,
+                          projects.filter((p) => p.status === "IN_PROGRESS").length,
+                          projects.filter((p) => p.status === "DONE").length,
+                        ],
+                        backgroundColor: ["#3B82F6", "#FBBF24", "#10B981"],
+                        borderColor: ["#2563EB", "#D97706", "#059669"],
+                        borderWidth: 1,
+                      },
+                    ],
+                  }}
+                  options={{
+                    maintainAspectRatio: false,
+                    plugins: {
+                      legend: { position: "top" },
+                    },
+                  }}
+                />
               </div>
             </div>
             <div className="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-sm border border-gray-200 dark:border-gray-700">
               <h3 className="font-medium mb-3 dark:text-white">Progresso Mensal</h3>
-              <div className="h-64 flex items-center justify-center">
-                {/* Espaço reservado para gráfico de barras */}
-                <div className="text-center text-gray-400">
-                  <FiTrendingUp size={48} className="mx-auto mb-2" />
-                  <p>Gráfico de progresso mensal</p>
-                </div>
+              <div className="h-64">
+                <Bar
+                  data={{
+                    labels: monthlyData.map((d) => d.month),
+                    datasets: [
+                      {
+                        label: "Projetos Concluídos",
+                        data: monthlyData.map((d) => d.completed),
+                        backgroundColor: "#10B981",
+                        borderColor: "#059669",
+                        borderWidth: 1,
+                      },
+                    ],
+                  }}
+                  options={{
+                    maintainAspectRatio: false,
+                    scales: {
+                      y: {
+                        beginAtZero: true,
+                        title: { display: true, text: "Projetos Concluídos" },
+                      },
+                      x: {
+                        title: { display: true, text: "Mês" },
+                      },
+                    },
+                    plugins: {
+                      legend: { display: false },
+                    },
+                  }}
+                />
               </div>
             </div>
           </div>
         </motion.section>
 
         {/* Seção do Kanban */}
-        <motion.section
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 0.4 }}
-        >
+        <motion.section initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.4 }}>
           <h2 className="text-xl font-semibold mb-4 dark:text-white">Quadro de Projetos</h2>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <ProjectColumn status="TO_DO" projects={projects} moveProject={moveProject} />
-            <ProjectColumn status="IN_PROGRESS" projects={projects} moveProject={moveProject} />
-            <ProjectColumn status="DONE" projects={projects} moveProject={moveProject} />
+            <ProjectColumn status="TO_DO" projects={projects} moveProject={moveProject} updatePriority={updatePriority} />
+            <ProjectColumn status="IN_PROGRESS" projects={projects} moveProject={moveProject} updatePriority={updatePriority} />
+            <ProjectColumn status="DONE" projects={projects} moveProject={moveProject} updatePriority={updatePriority} />
           </div>
         </motion.section>
       </div>

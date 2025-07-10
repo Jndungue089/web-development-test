@@ -12,7 +12,8 @@ type ProjectData = {
   startDate: string;
   endDate: string;
   members: string[];
-  status: "TO_DO" | "IN_PROGRESS" | "DONE"; // Update to match Project type
+  status: "TO_DO" | "IN_PROGRESS" | "DONE";
+  priority: "low" | "medium" | "high";
 };
 
 export default function ProjectFormPage() {
@@ -24,7 +25,8 @@ export default function ProjectFormPage() {
     startDate: "",
     endDate: "",
     members: [],
-    status: "TO_DO", // Default status for new projects
+    status: "TO_DO",
+    priority: "medium",
   });
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -47,7 +49,8 @@ export default function ProjectFormPage() {
               startDate: projectData.startDate,
               endDate: projectData.endDate,
               members: projectData.members || [],
-              status: projectData.status || "TO_DO", // Fallback to TO_DO if status is invalid
+              status: ["TO_DO", "IN_PROGRESS", "DONE"].includes(projectData.status) ? projectData.status : "TO_DO",
+              priority: ["low", "medium", "high"].includes(projectData.priority) ? projectData.priority : "medium",
             });
             setMembersInput(projectData.members?.join(", ") || "");
             setIsEditing(true);
@@ -62,11 +65,10 @@ export default function ProjectFormPage() {
     }
   }, [id]);
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { id, value } = e.target;
     setFormData((prev) => ({ ...prev, [id]: value }));
 
-    // Limpar erro quando o usuário digitar
     if (errors[id]) {
       setErrors((prev) => ({ ...prev, [id]: "" }));
     }
@@ -76,7 +78,6 @@ export default function ProjectFormPage() {
     const value = e.target.value;
     setMembersInput(value);
 
-    // Atualizar array de membros
     const membersArray = value
       .split(",")
       .map((m) => m.trim())
@@ -94,6 +95,14 @@ export default function ProjectFormPage() {
 
     if (formData.startDate && formData.endDate && formData.startDate > formData.endDate) {
       newErrors.endDate = "Data de término deve ser após a data de início";
+    }
+
+    if (!formData.status) {
+      newErrors.status = "Status é obrigatório";
+    }
+
+    if (!formData.priority) {
+      newErrors.priority = "Prioridade é obrigatória";
     }
 
     setErrors(newErrors);
@@ -117,19 +126,17 @@ export default function ProjectFormPage() {
         startDate: formData.startDate || null,
         endDate: formData.endDate || null,
         members: formData.members,
-        status: formData.status, // Include status
+        status: formData.status,
+        priority: formData.priority,
         updatedAt: serverTimestamp(),
       };
 
       if (isEditing && id) {
-        // Atualizar projeto existente
         await updateDoc(doc(db, "projects", id as string), projectData);
         toast.success("Projeto atualizado com sucesso!");
       } else {
-        // Criar novo projeto
         await addDoc(collection(db, "projects"), {
           ...projectData,
-          status: "TO_DO", // Set default status for new projects
           createdAt: serverTimestamp(),
         });
         toast.success("Projeto criado com sucesso!");
@@ -207,6 +214,46 @@ export default function ProjectFormPage() {
             />
           </div>
 
+          {/* Status */}
+          <div>
+            <label htmlFor="status" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              Status do Projeto <span className="text-red-500">*</span>
+            </label>
+            <select
+              id="status"
+              value={formData.status}
+              onChange={handleChange}
+              className={`w-full rounded-lg border ${
+                errors.status ? "border-red-500" : "border-gray-300 dark:border-gray-600"
+              } p-3 focus:ring-2 focus:ring-primary focus:outline-none dark:bg-gray-700 dark:text-white`}
+            >
+              <option value="TO_DO">Por Fazer</option>
+              <option value="IN_PROGRESS">Em Progresso</option>
+              <option value="DONE">Concluído</option>
+            </select>
+            {errors.status && <p className="mt-2 text-sm text-red-600 dark:text-red-400">{errors.status}</p>}
+          </div>
+
+          {/* Prioridade */}
+          <div>
+            <label htmlFor="priority" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              Prioridade do Projeto <span className="text-red-500">*</span>
+            </label>
+            <select
+              id="priority"
+              value={formData.priority}
+              onChange={handleChange}
+              className={`w-full rounded-lg border ${
+                errors.priority ? "border-red-500" : "border-gray-300 dark:border-gray-600"
+              } p-3 focus:ring-2 focus:ring-primary focus:outline-none dark:bg-gray-700 dark:text-white`}
+            >
+              <option value="low">Baixa</option>
+              <option value="medium">Média</option>
+              <option value="high">Alta</option>
+            </select>
+            {errors.priority && <p className="mt-2 text-sm text-red-600 dark:text-red-400">{errors.priority}</p>}
+          </div>
+
           {/* Datas */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
@@ -281,7 +328,7 @@ export default function ProjectFormPage() {
           <div className="flex justify-end gap-4 pt-4">
             <button
               type="button"
-              onCancel={() => router.push("/dashboard")}
+              onClick={() => router.push("/dashboard")}
               className="px-6 py-3 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition font-medium"
             >
               Cancelar
