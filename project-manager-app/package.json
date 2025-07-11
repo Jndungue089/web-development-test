@@ -13,6 +13,7 @@
     "@firebase/app": "^0.13.2",
     "@firebase/auth": "^1.10.8",
     "@firebase/firestore": "^4.8.0",
+    "@radix-ui/react-slot": "^1.2.3",
     "chart.js": "^4.5.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
@@ -20,6 +21,7 @@
     "firebase": "^11.10.0",
     "firebase-admin": "^13.4.0",
     "framer-motion": "^12.23.3",
+    "howler": "^2.2.4",
     "lucide-react": "^0.525.0",
     "next": "15.3.5",
     "next-themes": "^0.4.6",
@@ -32,9 +34,11 @@
     "react-firebase-hooks": "^5.1.1",
     "react-hook-form": "^7.60.0",
     "react-icons": "^5.5.0",
+    "react-router-dom": "^7.6.3",
     "sonner": "^2.0.6",
     "tailwind-merge": "^3.3.1",
-    "use-debounce": "^10.0.5"
+    "use-debounce": "^10.0.5",
+    "use-sound": "^5.0.0"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
@@ -42,6 +46,7 @@
     "@testing-library/react": "^16.3.0",
     "@testing-library/user-event": "^14.6.1",
     "@types/firebase": "^2.4.32",
+    "@types/howler": "^2.2.12",
     "@types/jest": "^30.0.0",
     "@types/node": "^20",
     "@types/react": "^19",

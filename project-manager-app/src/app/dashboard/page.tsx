@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
-import { collection, onSnapshot, updateDoc, doc, Timestamp } from "firebase/firestore";
+import { collection, onSnapshot, updateDoc, doc, Timestamp, serverTimestamp, addDoc } from "firebase/firestore";
 import { db, auth } from "@/firebase/config";
 import { useAuthState } from "react-firebase-hooks/auth";
 import { DndProvider, useDrag, useDrop } from "react-dnd";
@@ -28,6 +28,15 @@ type Project = {
   owner: string;
   members: string[];
   role: "Owner" | "Participant";
+};
+
+type Notification = {
+  projectId: string;
+  recipientEmail: string;
+  read: boolean;
+  message: string;
+  type: "status_update" | "deadline" | "priority_change" | "new_member";
+  createdAt: Timestamp;
 };
 
 // Componente: Card de Estatística
@@ -95,9 +104,8 @@ const ProjectCard = ({ project, moveProject, updatePriority }: { project: Projec
       whileHover={{ scale: 1.02 }}
       whileTap={{ scale: 0.98 }}
       transition={{ type: "spring", stiffness: 400, damping: 17 }}
-      className={`relative group rounded-lg shadow-sm border border-gray-200 bg-white dark:bg-gray-800 dark:border-gray-700 overflow-hidden transition-all ${
-        isDragging ? "opacity-70 shadow-lg rotate-1" : ""
-      }`}
+      className={`relative group rounded-lg shadow-sm border border-gray-200 bg-white dark:bg-gray-800 dark:border-gray-700 overflow-hidden transition-all ${isDragging ? "opacity-70 shadow-lg rotate-1" : ""
+        }`}
     >
       <Link href={`/dashboard/projects/${project.id}`} className="block p-4">
         <div className="flex justify-between items-start">
@@ -247,55 +255,61 @@ export default function DashboardPage() {
   const router = useRouter();
 
   useEffect(() => {
-  if (loadingAuth) return;
-  if (!user) {
-    router.push("/auth/login");
-    return;
-  }
+    if (loadingAuth) return;
+    if (!user) {
+      router.push("/auth/login");
+      return;
+    }
 
-  const unsubscribe = onSnapshot(collection(db, "projects"), (snapshot) => {
-    const projectsData: any = snapshot.docs
-      .map((doc) => {
-        const data = doc.data();
-        const validStatus = ["TO_DO", "IN_PROGRESS", "DONE"].includes(data.status) ? data.status : "TO_DO";
-        const parseDate = (date: any): Date | undefined => {
-          if (date instanceof Timestamp) return date.toDate();
-          if (typeof date === "string" && date) return new Date(date);
-          return undefined;
-        };
-        const priority = ["low", "medium", "high"].includes(data.priority) ? data.priority : undefined;
-        const isOwner = data.owner === user.uid;
-        const isMember = (data.members || []).includes(user.email); // Alterado para verificar por email
-        const role = isOwner ? "Owner" : isMember ? "Participant" : null;
+    const unsubscribe = onSnapshot(collection(db, "projects"), (snapshot) => {
+      const projectsData: any = snapshot.docs
+        .map((doc) => {
+          const data = doc.data();
+          const validStatus = ["TO_DO", "IN_PROGRESS", "DONE"].includes(data.status) ? data.status : "TO_DO";
+          const parseDate = (date: any): Date | undefined => {
+            if (date instanceof Timestamp) return date.toDate();
+            if (typeof date === "string" && date) return new Date(date);
+            return undefined;
+          };
+          const priority = ["low", "medium", "high"].includes(data.priority) ? data.priority : undefined;
+          const isOwner = data.owner === user.uid;
+          const isMember = (data.members || []).includes(user.email); // Alterado para verificar por email
+          const role = isOwner ? "Owner" : isMember ? "Participant" : null;
 
-        if (!role) return null;
+          if (!role) return null;
 
-        return {
-          id: doc.id,
-          title: data.title || "",
-          description: data.description || "",
-          status: validStatus as Project["status"],
-          priority,
-          createdAt: parseDate(data.createdAt),
-          startDate: parseDate(data.startDate),
-          endDate: parseDate(data.endDate),
-          owner: data.owner || "",
-          members: data.members || [],
-          role: role as "Owner" | "Participant",
-        };
-      })
-      .filter((project): project is Project => project !== null);
-    setProjects(projectsData);
-    setLoading(false);
-  });
+          return {
+            id: doc.id,
+            title: data.title || "",
+            description: data.description || "",
+            status: validStatus as Project["status"],
+            priority,
+            createdAt: parseDate(data.createdAt),
+            startDate: parseDate(data.startDate),
+            endDate: parseDate(data.endDate),
+            owner: data.owner || "",
+            members: data.members || [],
+            role: role as "Owner" | "Participant",
+          };
+        })
+        .filter((project): project is Project => project !== null);
+      setProjects(projectsData);
+      setLoading(false);
+    });
 
-  return () => unsubscribe();
-}, [user, loadingAuth, router]);
+    return () => unsubscribe();
+  }, [user, loadingAuth, router]);
 
   const moveProject = async (id: string, newStatus: Project["status"]) => {
     try {
       const projectRef = doc(db, "projects", id);
       await updateDoc(projectRef, { status: newStatus });
+
+      const project = projects.find(p => p.id === id);
+      if (project) {
+        await createStatusUpdateNotification(project, newStatus);
+      }
+
       toast.success(`Status atualizado para ${newStatus === "TO_DO" ? "Por Fazer" : newStatus === "IN_PROGRESS" ? "Em Progresso" : "Concluído"}`);
     } catch (error) {
       toast.error("Erro ao atualizar o projeto");
@@ -307,6 +321,12 @@ export default function DashboardPage() {
     try {
       const projectRef = doc(db, "projects", id);
       await updateDoc(projectRef, { priority: newPriority });
+
+      const project = projects.find(p => p.id === id);
+      if (project) {
+        await createPriorityChangeNotification(project, newPriority);
+      }
+
       toast.success(`Prioridade atualizada para ${newPriority === "high" ? "Alta" : newPriority === "medium" ? "Média" : "Baixa"}`);
     } catch (error) {
       toast.error("Erro ao atualizar prioridade");
@@ -327,6 +347,105 @@ export default function DashboardPage() {
     }).length,
     completionRate: projects.length > 0 ? Math.round((projects.filter((p) => p.status === "DONE").length / projects.length) * 100) : 0,
     highPriority: projects.filter((p) => p.priority === "high").length,
+  };
+
+  const createStatusUpdateNotification = async (project: Project, newStatus: string) => {
+    const statusMessages = {
+      "TO_DO": "foi movido para 'Por Fazer'",
+      "IN_PROGRESS": "foi movido para 'Em Progresso'",
+      "DONE": "foi concluído"
+    };
+
+    const notifications = project.members
+      .filter(email => email !== user?.email)
+      .map(async (email) => {
+        try {
+          await addDoc(collection(db, "notifications"), {
+            projectId: project.id,
+            recipientEmail: email,
+            read: false,
+            message: `O projeto "${project.title}" ${statusMessages[newStatus as keyof typeof statusMessages]}`,
+            type: "status_update",
+            createdAt: serverTimestamp(),
+          });
+        } catch (error) {
+          console.error(`Error creating notification for ${email}:`, error);
+        }
+      });
+
+    await Promise.all(notifications);
+  };
+
+  const createDeadlineNotifications = async () => {
+    const today = new Date();
+    const projectsNearDeadline = projects.filter(p => {
+      if (p.status === "DONE" || !p.endDate) return false;
+
+      const endDate = new Date(p.endDate);
+      const timeDiff = endDate.getTime() - today.getTime();
+      const daysDiff = Math.ceil(timeDiff / (1000 * 3600 * 24));
+
+      return daysDiff <= 3; // Notificar para prazos em até 3 dias
+    });
+
+    for (const project of projectsNearDeadline) {
+      const notifications = project.members.map(async (email) => {
+        try {
+          const endDate = new Date(project.endDate);
+          const timeDiff = endDate.getTime() - today.getTime();
+          const daysDiff = Math.ceil(timeDiff / (1000 * 3600 * 24));
+
+          let message = "";
+          if (daysDiff === 0) {
+            message = `O prazo do projeto "${project.title}" vence hoje!`;
+          } else if (daysDiff < 0) {
+            message = `O prazo do projeto "${project.title}" venceu há ${Math.abs(daysDiff)} dia(s)!`;
+          } else {
+            message = `O prazo do projeto "${project.title}" vence em ${daysDiff} dia(s)`;
+          }
+
+          await addDoc(collection(db, "notifications"), {
+            projectId: project.id,
+            recipientEmail: email,
+            read: false,
+            message,
+            type: "deadline",
+            createdAt: serverTimestamp(),
+          });
+        } catch (error) {
+          console.error(`Error creating deadline notification:`, error);
+        }
+      });
+
+      await Promise.all(notifications);
+    }
+  };
+
+  const createPriorityChangeNotification = async (project: Project, newPriority: string) => {
+    const priorityNames = {
+      "low": "baixa",
+      "medium": "média",
+      "high": "alta"
+    };
+
+    const notifications = project.members
+      .filter(email => email !== user?.email)
+      .map(async (email) => {
+        try {
+          await addDoc(collection(db, "notifications"), {
+            projectId: project.id,
+            recipientEmail: email,
+            read: false,
+            message: `A prioridade do projeto "${project.title}" foi alterada para ${priorityNames[newPriority as keyof typeof priorityNames]}`,
+            type: "priority_change",
+            createdAt: serverTimestamp(),
+          });
+        } catch (error) {
+          console.error(`Error creating notification for ${email}:`, error);
+        }
+      });
+
+    await Promise.all(notifications);
   };
 
   // Dados para o gráfico de Progresso Mensal

@@ -108,14 +108,12 @@ export default function Header({ onUserMenu }: { onUserMenu?: () => void }) {
   // Carregar notificações em tempo real
   useEffect(() => {
     if (user?.uid) {
-      console.log(user)
 
       const q = query(
         collection(db, "notifications"),
         where("recipientEmail", "==", user.email),
         where("read", "==", false)
       );
-      console.log(q)
       const unsubscribe = onSnapshot(q, (snapshot) => {
         const notifs = snapshot.docs.map(doc => ({
           id: doc.id,

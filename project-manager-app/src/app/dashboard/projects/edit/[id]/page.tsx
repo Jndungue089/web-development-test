@@ -1,58 +1,60 @@
 "use client";
 import { useState, useEffect } from "react";
-import { doc, getDoc, updateDoc, Timestamp, serverTimestamp } from "firebase/firestore";
-import { db } from "@/firebase/config";
+import { doc, getDoc, updateDoc, Timestamp, serverTimestamp, getDocs, query, where, collection, addDoc } from "firebase/firestore";
+import { db, auth } from "@/firebase/config";
 import { useRouter, useParams } from "next/navigation";
+import { useAuthState } from "react-firebase-hooks/auth";
 import { toast } from "sonner";
-import { FiUser, FiCalendar, FiFileText, FiSave, FiTag } from "react-icons/fi";
+import { FiUser, FiCalendar, FiFileText, FiSave } from "react-icons/fi";
+import { X } from "lucide-react";
+import { getAuth, fetchSignInMethodsForEmail } from "firebase/auth";
+import { useDebounce } from "use-debounce";
 
-type Project = {
-  id: string;
-  title: string;
-  description: string;
-  startDate: string | Timestamp;
-  endDate: string | Timestamp;
-  members: string[];
-  createdAt: Date | Timestamp;
-  owner: string;
-  tags?: string[];
-  status: "TO_DO" | "IN_PROGRESS" | "DONE";
-  priority: "low" | "medium" | "high";
-};
-
+// Tipos para o projeto, alinhado com DashboardPage.tsx
 type ProjectData = {
+  id?: string;
   title: string;
   description: string;
-  startDate: string;
-  endDate: string;
-  members: string[];
-  tags: string[];
   status: "TO_DO" | "IN_PROGRESS" | "DONE";
   priority: "low" | "medium" | "high";
+  createdAt?: Date | Timestamp;
+  startDate?: string;
+  endDate?: string;
+  owner: string;
+  members: string[];
 };
 
 export default function ProjectEditPage() {
   const { id } = useParams();
   const router = useRouter();
+  const [user, loadingAuth] = useAuthState(auth);
   const [formData, setFormData] = useState<ProjectData>({
     title: "",
     description: "",
-    startDate: "",
-    endDate: "",
-    members: [],
-    tags: [],
     status: "TO_DO",
     priority: "medium",
+    owner: "",
+    members: [],
   });
   const [loading, setLoading] = useState(true);
   const [errors, setErrors] = useState<Record<string, string>>({});
-  const [membersInput, setMembersInput] = useState("");
-  const [tagsInput, setTagsInput] = useState("");
+  const [emailInput, setEmailInput] = useState("");
+  const [isSearching, setIsSearching] = useState(false);
+  const [debouncedEmailInput] = useDebounce(emailInput, 500);
+
+  // Redirect unauthenticated users
+  useEffect(() => {
+    if (!loadingAuth && !user) {
+      router.push("/auth/login");
+    } else if (user) {
+      setFormData((prev) => ({ ...prev, owner: user.uid }));
+    }
+  }, [user, loadingAuth, router]);
 
   // Carregar dados do projeto para edição
   useEffect(() => {
-    if (!id) {
-      toast.error("ID do projeto não fornecido");
+    if (!id || !user) {
+      toast.error("ID do projeto ou usuário não fornecido");
       router.push("/dashboard");
       return;
     }
@@ -63,27 +65,25 @@ export default function ProjectEditPage() {
         const docSnap = await getDoc(docRef);
 
         if (docSnap.exists()) {
-          const projectData = docSnap.data() as Project;
-          const parseDate = (date: string | Timestamp | undefined): string => {
-            if (!date) return "";
-            if (date instanceof Timestamp) {
-              return date.toDate().toISOString().split("T")[0];
-            }
-            return date;
+          const projectData = docSnap.data() as ProjectData;
+          const parseDate = (date: any): string | undefined => {
+            if (!date) return undefined;
+            if (date instanceof Timestamp) return date.toDate().toISOString().split("T")[0];
+            if (typeof date === "string" && date) return date;
+            return undefined;
           };
-
           setFormData({
+            id: docSnap.id,
             title: projectData.title || "",
             description: projectData.description || "",
-            startDate: parseDate(projectData.startDate),
-            endDate: parseDate(projectData.endDate),
-            members: projectData.members || [],
-            tags: projectData.tags || [],
             status: ["TO_DO", "IN_PROGRESS", "DONE"].includes(projectData.status) ? projectData.status : "TO_DO",
             priority: ["low", "medium", "high"].includes(projectData.priority) ? projectData.priority : "medium",
+            createdAt: projectData.createdAt,
+            startDate: parseDate(projectData.startDate),
+            endDate: parseDate(projectData.endDate),
+            owner: projectData.owner || user.uid,
+            members: projectData.members || [],
           });
-          setMembersInput(projectData.members?.join(", ") || "");
-          setTagsInput(projectData.tags?.join(", ") || "");
         } else {
           toast.error("Projeto não encontrado");
           router.push("/dashboard");
@@ -98,7 +98,7 @@ export default function ProjectEditPage() {
     };
 
     fetchProject();
-  }, [id, router]);
+  }, [id, user, router]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { id, value } = e.target;
@@ -109,28 +109,68 @@ export default function ProjectEditPage() {
     }
   };
 
-  const handleMembersChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = e.target.value;
-    setMembersInput(value);
+  const handleAddMember = async () => {
+    const email = emailInput.trim();
+    if (!email) return;
 
-    const membersArray = value
-      .split(",")
-      .map((m) => m.trim())
-      .filter((m) => m !== "");
+    // Verificar duplicação
+    if (formData.members.includes(email)) {
+      toast.error("Este email já foi adicionado");
+      return;
+    }
 
-    setFormData((prev) => ({ ...prev, members: membersArray }));
+    // Validar formato do email
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      toast.error("Por favor, insira um email válido");
+      return;
+    }
+
+    setIsSearching(true);
+
+    try {
+      const authInstance = getAuth();
+      let userExists = false;
+
+      // Verificar se existe no Auth
+      const signInMethods = await fetchSignInMethodsForEmail(authInstance, email);
+      if (signInMethods.length > 0) {
+        userExists = true;
+      }
+
+      // Verificar se existe na coleção "users"
+      if (!userExists) {
+        const usersRef = collection(db, "users");
+        const q = query(usersRef, where("email", "==", email));
+        const querySnapshot = await getDocs(q);
+        if (!querySnapshot.empty) {
+          userExists = true;
+        }
+      }
+
+      if (userExists) {
+        setFormData((prev) => ({
+          ...prev,
+          members: [...prev.members, email],
+        }));
+        setEmailInput("");
+        toast.success(`Usuário ${email} adicionado com sucesso`);
+      } else {
+        toast.error("Usuário não encontrado");
+      }
+    } catch (error) {
+      console.error("Erro ao verificar o email:", error);
+      toast.error("Erro ao verificar o email");
+    } finally {
+      setIsSearching(false);
+    }
   };
 
-  const handleTagsChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = e.target.value;
-    setTagsInput(value);
-
-    const tagsArray = value
-      .split(",")
-      .map((t) => t.trim())
-      .filter((t) => t !== "");
-
-    setFormData((prev) => ({ ...prev, tags: tagsArray }));
+  const removeMember = (email: string) => {
+    setFormData((prev) => ({
+      ...prev,
+      members: prev.members.filter((m) => m !== email),
+    }));
+    toast.success(`Usuário ${email} removido`);
   };
 
   const validateForm = (): boolean => {
@@ -148,24 +188,47 @@ export default function ProjectEditPage() {
       newErrors.endDate = "Data de término inválida";
     }
 
-    if (formData.startDate && formData.endDate && formData.startDate > formData.endDate) {
-      newErrors.endDate = "Data de término deve ser após a data de início";
-    }
-
-    if (!formData.status) {
-      newErrors.status = "Status é obrigatório";
-    }
-
-    if (!formData.priority) {
-      newErrors.priority = "Prioridade é obrigatória";
+    if (formData.startDate && formData.endDate) {
+      const start = new Date(formData.startDate);
+      const end = new Date(formData.endDate);
+      if (start > end) {
+        newErrors.endDate = "Data de término deve ser após a data de início";
+      }
     }
 
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
 
+  const createNotifications = async (projectId: string, members: string[]) => {
+    const notificationPromises = members
+      .filter((email) => email !== user?.email)
+      .map(async (email) => {
+        try {
+          await addDoc(collection(db, "notifications"), {
+            projectId,
+            recipientEmail: email,
+            read: false,
+            message: `Você foi adicionado ao projeto "${formData.title}"`,
+            createdAt: serverTimestamp(),
+          });
+          toast.success(`Notificação enviada para ${email}`);
+        } catch (error) {
+          console.error(`Error creating notification for ${email}:`, error);
+          toast.error(`Erro ao enviar notificação para ${email}`);
+        }
+      });
+
+    await Promise.all(notificationPromises);
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    if (!user) {
+      router.push("/auth/login");
+      return;
+    }
 
     if (!validateForm()) {
       toast.error("Por favor, corrija os erros no formulário");
@@ -181,15 +244,21 @@ export default function ProjectEditPage() {
         startDate: formData.startDate ? Timestamp.fromDate(new Date(formData.startDate)) : null,
         endDate: formData.endDate ? Timestamp.fromDate(new Date(formData.endDate)) : null,
         members: formData.members,
-        tags: formData.tags,
+        owner: user.uid,
         status: formData.status,
-        priority: formData.priority,
+        priority: formData.priority || "medium",
         updatedAt: serverTimestamp(),
       };
 
       await updateDoc(doc(db, "projects", id as string), projectData);
       toast.success("Projeto atualizado com sucesso!");
-      router.push(`/dashboard/projects/${id}`);
+
+      // Enviar notificações para membros adicionados
+      if (formData.members.length > 0) {
+        await createNotifications(id as string, formData.members);
+      }
+
+      router.push("/dashboard");
     } catch (error) {
       console.error("Error updating project:", error);
       toast.error("Erro ao atualizar projeto");
@@ -198,8 +267,12 @@ export default function ProjectEditPage() {
     }
   };
 
-  if (loading) {
+  if (loading || loadingAuth) {
     return <div className="flex justify-center p-8">Carregando...</div>;
+  }
+
+  if (!user) {
+    return null;
   }
 
   return (
@@ -283,7 +356,7 @@ export default function ProjectEditPage() {
             </label>
             <select
               id="priority"
-              value={formData.priority}
+              value={formData.priority || "medium"}
               onChange={handleChange}
               className={`w-full rounded-lg border ${
                 errors.priority ? "border-red-500" : "border-gray-300 dark:border-gray-600"
@@ -309,7 +382,7 @@ export default function ProjectEditPage() {
               <input
                 id="startDate"
                 type="date"
-                value={formData.startDate}
+                value={formData.startDate || ""}
                 onChange={handleChange}
                 className={`w-full rounded-lg border ${
                   errors.startDate ? "border-red-500" : "border-gray-300 dark:border-gray-600"
@@ -329,9 +402,9 @@ export default function ProjectEditPage() {
               <input
                 id="endDate"
                 type="date"
-                value={formData.endDate}
+                value={formData.endDate || ""}
                 onChange={handleChange}
-                min={formData.startDate}
+                min={formData.startDate || ""}
                 className={`w-full rounded-lg border ${
                   errors.endDate ? "border-red-500" : "border-gray-300 dark:border-gray-600"
                 } p-3 focus:ring-2 focus:ring-primary focus:outline-none dark:bg-gray-700 dark:text-white`}
@@ -349,52 +422,48 @@ export default function ProjectEditPage() {
               <FiUser size={16} />
               Membros da Equipe
             </label>
-            <input
-              id="members"
-              type="text"
-              value={membersInput}
-              onChange={handleMembersChange}
-              placeholder="Ex: joao@empresa.com, maria@empresa.com"
-              className="w-full rounded-lg border border-gray-300 dark:border-gray-600 p-3 focus:ring-2 focus:ring-primary focus:outline-none dark:bg-gray-700 dark:text-white"
-            />
-            <div className="mt-2 flex flex-wrap gap-2">
-              {formData.members.map((member, index) => (
-                <span key={index} className="px-3 py-1 bg-gray-100 dark:bg-gray-700 rounded-full text-sm">
-                  {member}
-                </span>
-              ))}
+            <div className="flex gap-2">
+              <input
+                id="members"
+                type="email"
+                value={emailInput}
+                onChange={(e) => setEmailInput(e.target.value)}
+                placeholder="Digite o email do membro"
+                className="flex-1 rounded-lg border border-gray-300 dark:border-gray-600 p-3 focus:ring-2 focus:ring-primary focus:outline-none dark:bg-gray-700 dark:text-white"
+              />
+              <button
+                type="button"
+                onClick={handleAddMember}
+                disabled={isSearching}
+                className="px-4 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
+              >
+                {isSearching ? "Verificando..." : "Adicionar"}
+              </button>
             </div>
+            {formData.members.length > 0 && (
+              <div className="mt-3">
+                <p className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Membros adicionados:</p>
+                <div className="flex flex-wrap gap-2">
+                  {formData.members.map((member, index) => (
+                    <div
+                      key={index}
+                      className="px-3 py-1 bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-200 rounded-full text-sm flex items-center"
+                    >
+                      {member}
+                      <button
+                        type="button"
+                        onClick={() => removeMember(member)}
+                        className="ml-2 text-blue-500 hover:text-blue-700 dark:hover:text-blue-300"
+                      >
+                        <X size={14} />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
             <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
-              Separe os e-mails por vírgulas. Membros adicionados: {formData.members.length}
-            </p>
-          </div>
-
-          {/* Tags */}
-          <div>
-            <label
-              htmlFor="tags"
-              className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2 flex items-center gap-2"
-            >
-              <FiTag size={16} />
-              Tags
-            </label>
-            <input
-              id="tags"
-              type="text"
-              value={tagsInput}
-              onChange={handleTagsChange}
-              placeholder="Ex: desenvolvimento, urgente, frontend"
-              className="w-full rounded-lg border border-gray-300 dark:border-gray-600 p-3 focus:ring-2 focus:ring-primary focus:outline-none dark:bg-gray-700 dark:text-white"
-            />
-            <div className="mt-2 flex flex-wrap gap-2">
-              {formData.tags.map((tag, index) => (
-                <span key={index} className="px-3 py-1 bg-gray-100 dark:bg-gray-700 rounded-full text-sm">
-                  {tag}
-                </span>
-              ))}
-            </div>
-            <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
-              Separe as tags por vírgulas. Tags adicionadas: {formData.tags.length}
+              Digite um email por vez e clique em "Adicionar". Membros adicionados: {formData.members.length}
             </p>
           </div>
 
@@ -402,7 +471,7 @@ export default function ProjectEditPage() {
           <div className="flex justify-end gap-4 pt-4">
             <button
               type="button"
-              onClick={() => router.push(`/dashboard/projects/${id}`)}
+              onClick={() => router.push("/dashboard")}
               className="px-6 py-3 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition font-medium"
             >
               Cancelar

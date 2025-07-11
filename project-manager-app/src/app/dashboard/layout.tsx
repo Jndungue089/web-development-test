@@ -1,24 +1,89 @@
 "use client";
 import { useEffect, useState } from "react";
 import { onAuthStateChanged, signOut } from "firebase/auth";
-import { auth } from "@/firebase/config";
-import { useRouter } from "next/navigation";
+import { auth, db } from "@/firebase/config";
+import { useRouter, usePathname } from "next/navigation";
 import Header from "@/components/dashboard/Header";
 import { toast } from "sonner";
-import { FiLogOut } from "react-icons/fi";
+import { addDoc, collection, onSnapshot, serverTimestamp } from "@firebase/firestore";
+import { set } from "react-hook-form";
+import { Button } from "@/components/ui/button";
+import ToastProvider from "@/components/ToastProvider";
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
-  const [user, setUser] = useState<null | { displayName?: string | null; email?: string | null }>(null);
+  const [user, setUser] = useState<null | { name?: string | null; email?: string | null }>(null);
+  const [back, setBack] = useState(false);
   const router = useRouter();
+  const otherRouter = usePathname();
+
+
+
+  useEffect(() => {
+    if (!user || loading) return;
+
+    const membersCache = new Map<string, string[]>();
+
+    const createNotifications = async (projectId: string, members: string[], name: string) => {
+      const notificationPromises = members
+        .filter(email => email !== user?.email)
+        .map(async (email) => {
+          try {
+            await addDoc(collection(db, "notifications"), {
+              projectId,
+              recipientEmail: email,
+              read: false,
+              message: `Você foi adicionado ao projeto "${name}"`,
+              createdAt: serverTimestamp(),
+            });
+            toast.success(`Notificação enviada para ${email}`);
+          } catch (error) {
+            console.error(`Error creating notification for ${email}:`, error);
+            toast.error(`Erro ao enviar notificação para ${email}`);
+          }
+        });
+
+      await Promise.all(notificationPromises);
+    };
+
+    const unsubscribe = onSnapshot(collection(db, "projects"), (snapshot) => {
+      snapshot.docChanges().forEach((change) => {
+        if (change.type === "modified") {
+          const doc = change.doc;
+          const data = doc.data();
+          const projectId = doc.id;
+
+          const newMembers: string[] = data.members || [];
+          const oldMembers: string[] = membersCache.get(projectId) || [];
+
+          const addedMembers = newMembers.filter((email) => !oldMembers.includes(email));
+          if (addedMembers.length > 0) {
+            createNotifications(projectId, addedMembers, data.title);
+          }
+
+          membersCache.set(projectId, newMembers);
+        }
+      });
+    });
+
+    return () => unsubscribe();
+  }, [user, loading]);
 
   // Determine greeting based on current time (WAT, July 10, 2025, 06:18 PM)
   const currentHour = new Date().getHours();
   const greeting = currentHour < 12
     ? "Bom dia"
     : currentHour < 18
-    ? "Boa tarde"
-    : "Boa noite";
+      ? "Boa tarde"
+      : "Boa noite";
+
+    useEffect(() => {
+          if (otherRouter === "/dashboard") {
+      setBack(false);
+    }
+    if (otherRouter !== "/dashboard") {
+      setBack(true);
+    }}, [otherRouter]);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
@@ -27,7 +92,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         toast.error("Sessão expirada. Faça login novamente.");
       } else {
         setUser({
-          displayName: currentUser.displayName,
+          name: currentUser.displayName,
           email: currentUser.email,
         });
         setLoading(false);
@@ -73,11 +138,12 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100 antialiased">
+      <ToastProvider />
       <Header onUserMenu={() => handleSignOut()} />
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
         <div className="mb-6">
           <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
-            {greeting}, {user?.displayName || user?.email?.split("@")[0] || "Usuário"}!
+            {greeting}, {user?.name || user?.email?.split("@")[0] || "Usuário"}!
           </h1>
           <p className="text-sm text-gray-600 dark:text-gray-400">
             Gerencie seus projetos com eficiência - {new Date().toLocaleDateString("pt-BR", {
@@ -90,6 +156,15 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         </div>
 
         <main className="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-6">
+          {back && (
+            <Button
+              variant="outline"
+              className="mb-4"
+              onClick={() => router.back()}
+            >
+              Voltar
+            </Button>
+          )}
           {children}
         </main>
       </div>
