@@ -1,6 +1,6 @@
 "use client";
-import { useState, useEffect } from "react";
-import { FiX, FiCalendar, FiUser, FiMessageSquare, FiAlertCircle, FiCheck } from "react-icons/fi";
+import { useState } from "react";
+import { FiX, FiCalendar, FiUser, FiAlertCircle, FiCheck } from "react-icons/fi";
 import { doc, setDoc, updateDoc, Timestamp, collection } from "firebase/firestore";
 import { db } from "@/firebase/config";
 import { toast } from "sonner";

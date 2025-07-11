@@ -5,9 +5,22 @@ import { db } from "@/firebase/config";
 import CommentForm from "./CommentForm";
 import CommentList from "./CommentList";
 
+type Task = {
+  id: string;
+  title: string;
+  description: string;
+  notes?: string;
+  status: 'pending' | 'in_progress' | 'completed' | 'overdue';
+  dueDate?: string;
+  completedAt?: string;
+  assignedTo?: string[];
+  createdAt: Date;
+  priority?: 'low' | 'medium' | 'high';
+};
+
 export default function TaskItem({ projectId, task, onStatusChange, onDelete }: {
   projectId: string;
-  task: any;
+  task: Task;
   onStatusChange: () => void;
   onDelete: () => void;
 }) {
@@ -40,12 +53,12 @@ export default function TaskItem({ projectId, task, onStatusChange, onDelete }: 
         <div className="flex gap-2 items-center">
           <button
             className="text-xs px-2 py-1 rounded bg-green-100 text-green-800 hover:bg-green-200"
-            disabled={loading || task.status === 'concluída'}
+            disabled={loading || task.status === 'completed'}
             onClick={() => handleStatus('concluída')}
           >Concluir</button>
           <button
             className="text-xs px-2 py-1 rounded bg-yellow-100 text-yellow-800 hover:bg-yellow-200"
-            disabled={loading || task.status === 'em progresso'}
+            disabled={loading || task.status === 'in_progress'}
             onClick={() => handleStatus('em progresso')}
           >Em progresso</button>
           <button

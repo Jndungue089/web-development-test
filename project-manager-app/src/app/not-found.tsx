@@ -1,7 +1,7 @@
 "use client";
 import { motion } from "framer-motion";
 import Link from "next/link";
-import { FiHome, FiCompass, FiMeh } from "react-icons/fi";
+import { FiHome, FiMeh } from "react-icons/fi";
 
 export default function NotFound() {
   return (

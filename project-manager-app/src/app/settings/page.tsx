@@ -143,7 +143,7 @@ export default function AccountSettings() {
 
       toast.success("Conta excluída com sucesso");
       router.push("/");
-    } catch (error: any) {
+    } catch (error: Error | any) {
       console.error("Error deleting account:", error);
       toast.error(
         error.code === "auth/wrong-password"

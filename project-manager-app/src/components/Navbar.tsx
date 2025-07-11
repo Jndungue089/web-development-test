@@ -1,7 +1,7 @@
 "use client";
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { FiHome, FiInfo, FiGrid, FiMail, FiUser, FiLogIn, FiLogOut, FiMoon, FiSun } from "react-icons/fi";
+import { FiHome, FiInfo, FiGrid, FiMail, FiUser, FiLogIn, FiMoon, FiSun } from "react-icons/fi";
 import { useRouter } from "next/navigation";
 import { getAuth, onAuthStateChanged, signOut } from "firebase/auth";
 import { getFirestore, doc, getDoc } from "firebase/firestore";

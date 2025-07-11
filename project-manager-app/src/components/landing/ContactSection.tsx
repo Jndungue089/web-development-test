@@ -2,7 +2,7 @@
 import { motion } from "framer-motion";
 import { FiMail, FiPhone, FiMapPin, FiSend, FiCheckCircle, FiAlertCircle, FiLoader } from "react-icons/fi";
 import { useReducer, useCallback } from "react";
-import { useForm, FieldError } from "react-hook-form";
+import { useForm } from "react-hook-form";
 
 type FormState = {
   isLoading: boolean;
