@@ -1,58 +1,87 @@
 "use client";
 import { useState, useEffect } from "react";
-import { addDoc, collection, serverTimestamp, doc, updateDoc, getDoc } from "firebase/firestore";
-import { db } from "@/firebase/config";
+import { addDoc, collection, serverTimestamp, doc, updateDoc, getDoc, Timestamp, getDocs, getFirestore, query, where } from "firebase/firestore";
+import { db, auth } from "@/firebase/config";
 import { useRouter, useParams } from "next/navigation";
+import { useAuthState } from "react-firebase-hooks/auth";
 import { toast } from "sonner";
-import { FiUser, FiCalendar, FiFileText, FiPlus, FiSave } from "react-icons/fi";
+import { FiUser, FiCalendar, FiFileText, FiPlus, FiSave, FiSearch } from "react-icons/fi";
+import { getAuth, fetchSignInMethodsForEmail } from "firebase/auth";
+import { X } from "lucide-react";
 
-type ProjectData = {
+type Project = {
+  id?: string;
   title: string;
   description: string;
-  startDate: string;
-  endDate: string;
+  startDate: string | Date;
+  endDate: string | Date;
   members: string[];
+  owner: string;
   status: "TO_DO" | "IN_PROGRESS" | "DONE";
   priority: "low" | "medium" | "high";
+  createdAt?: Timestamp;
+  updatedAt?: Timestamp;
 };
 
 export default function ProjectFormPage() {
   const { id } = useParams();
   const router = useRouter();
-  const [formData, setFormData] = useState<ProjectData>({
+  const [user, loadingAuth] = useAuthState(auth);
+  const [formData, setFormData] = useState<Project>({
     title: "",
     description: "",
     startDate: "",
     endDate: "",
     members: [],
+    owner: "",
     status: "TO_DO",
     priority: "medium",
   });
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isEditing, setIsEditing] = useState(false);
-  const [membersInput, setMembersInput] = useState("");
+  const [emailInput, setEmailInput] = useState("");
+  const [isSearching, setIsSearching] = useState(false);
 
-  // Verificar se é edição e carregar dados do projeto
+  // Redirect unauthenticated users
   useEffect(() => {
-    if (id) {
+    if (!loadingAuth && !user) {
+      router.push("/auth/login");
+    } else if (user) {
+      setFormData((prev) => ({ ...prev, owner: user.uid }));
+    }
+  }, [user, loadingAuth, router]);
+
+  // Load project data for editing
+  useEffect(() => {
+    if (id && user) {
       const fetchProject = async () => {
         try {
           const docRef = doc(db, "projects", id as string);
           const docSnap = await getDoc(docRef);
 
           if (docSnap.exists()) {
-            const projectData = docSnap.data() as ProjectData;
+            const projectData = docSnap.data() as Project;
             setFormData({
+              ...projectData,
+              id: docSnap.id,
               title: projectData.title,
               description: projectData.description,
-              startDate: projectData.startDate,
-              endDate: projectData.endDate,
+              startDate: projectData.startDate instanceof Timestamp
+                ? projectData.startDate.toDate().toISOString().split('T')[0]
+                : typeof projectData.startDate === 'string'
+                  ? projectData.startDate
+                  : '',
+              endDate: projectData.endDate instanceof Timestamp
+                ? projectData.endDate.toDate().toISOString().split('T')[0]
+                : typeof projectData.endDate === 'string'
+                  ? projectData.endDate
+                  : '',
               members: projectData.members || [],
-              status: ["TO_DO", "IN_PROGRESS", "DONE"].includes(projectData.status) ? projectData.status : "TO_DO",
-              priority: ["low", "medium", "high"].includes(projectData.priority) ? projectData.priority : "medium",
+              owner: projectData.owner || user.uid,
+              status: projectData.status || "TO_DO",
+              priority: projectData.priority || "medium",
             });
-            setMembersInput(projectData.members?.join(", ") || "");
             setIsEditing(true);
           }
         } catch (error) {
@@ -63,7 +92,7 @@ export default function ProjectFormPage() {
 
       fetchProject();
     }
-  }, [id]);
+  }, [id, user]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { id, value } = e.target;
@@ -74,16 +103,71 @@ export default function ProjectFormPage() {
     }
   };
 
-  const handleMembersChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = e.target.value;
-    setMembersInput(value);
+  const handleAddMember = async () => {
+  const email = emailInput.trim();
+  if (!email) return;
 
-    const membersArray = value
-      .split(",")
-      .map((m) => m.trim())
-      .filter((m) => m !== "");
+  // Verificar duplicação
+  if (formData.members.includes(email)) {
+    toast.error("Este email já foi adicionado");
+    return;
+  }
 
-    setFormData((prev) => ({ ...prev, members: membersArray }));
+  // Validar formato do email
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    toast.error("Por favor, insira um email válido");
+    return;
+  }
+
+  setIsSearching(true);
+
+  try {
+    const auth = getAuth();
+    const db = getFirestore();
+
+    let userExists = false;
+
+    // 🔍 1. Verificar se existe no Auth
+    const signInMethods = await fetchSignInMethodsForEmail(auth, email);
+    if (signInMethods.length > 0) {
+      userExists = true;
+    }
+
+    // 🔍 2. Verificar se existe na coleção "users"
+    if (!userExists) {
+      const usersRef = collection(db, "users");
+      const q = query(usersRef, where("email", "==", email));
+      const querySnapshot = await getDocs(q);
+
+      if (!querySnapshot.empty) {
+        userExists = true;
+      }
+    }
+
+    if (userExists) {
+      setFormData((prev) => ({
+        ...prev,
+        members: [...prev.members, email],
+      }));
+      setEmailInput("");
+      toast.success(`Usuário ${email} adicionado com sucesso`);
+    } else {
+      toast.error("Usuário não encontrado");
+    }
+  } catch (error) {
+    console.error("Erro ao verificar o email:", error);
+    toast.error("Erro ao verificar o email");
+  } finally {
+    setIsSearching(false);
+  }
+};
+
+  const removeMember = (email: string) => {
+    setFormData(prev => ({
+      ...prev,
+      members: prev.members.filter(m => m !== email)
+    }));
+    toast.success(`Usuário ${email} removido`);
   };
 
   const validateForm = (): boolean => {
@@ -97,20 +181,39 @@ export default function ProjectFormPage() {
       newErrors.endDate = "Data de término deve ser após a data de início";
     }
 
-    if (!formData.status) {
-      newErrors.status = "Status é obrigatório";
-    }
-
-    if (!formData.priority) {
-      newErrors.priority = "Prioridade é obrigatória";
-    }
-
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
 
+  const createNotifications = async (projectId: string, members: string[]) => {
+    const notificationPromises = members
+      .filter(email => email !== user?.email)
+      .map(async (email) => {
+        try {
+          await addDoc(collection(db, "notifications"), {
+            projectId,
+            recipientEmail: email,
+            read: false,
+            message: `Você foi adicionado ao projeto "${formData.title}"`,
+            createdAt: serverTimestamp(),
+          });
+          toast.success(`Notificação enviada para ${email}`);
+        } catch (error) {
+          console.error(`Error creating notification for ${email}:`, error);
+          toast.error(`Erro ao enviar notificação para ${email}`);
+        }
+      });
+
+    await Promise.all(notificationPromises);
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    if (!user) {
+      router.push("/auth/login");
+      return;
+    }
 
     if (!validateForm()) {
       toast.error("Por favor, corrija os erros no formulário");
@@ -123,23 +226,32 @@ export default function ProjectFormPage() {
       const projectData = {
         title: formData.title.trim(),
         description: formData.description.trim(),
-        startDate: formData.startDate || null,
-        endDate: formData.endDate || null,
+        startDate: formData.startDate ? Timestamp.fromDate(new Date(formData.startDate)) : null,
+        endDate: formData.endDate ? Timestamp.fromDate(new Date(formData.endDate)) : null,
         members: formData.members,
+        owner: user.uid,
         status: formData.status,
         priority: formData.priority,
         updatedAt: serverTimestamp(),
       };
 
+      let projectId = id as string;
+
       if (isEditing && id) {
         await updateDoc(doc(db, "projects", id as string), projectData);
         toast.success("Projeto atualizado com sucesso!");
       } else {
-        await addDoc(collection(db, "projects"), {
+        const docRef = await addDoc(collection(db, "projects"), {
           ...projectData,
           createdAt: serverTimestamp(),
         });
+        projectId = docRef.id;
         toast.success("Projeto criado com sucesso!");
+      }
+
+      // Enviar notificações para os membros adicionados
+      if (formData.members.length > 0) {
+        await createNotifications(projectId, formData.members);
       }
 
       router.push("/dashboard");
@@ -150,6 +262,14 @@ export default function ProjectFormPage() {
       setLoading(false);
     }
   };
+
+  if (loadingAuth) {
+    return <div className="text-center py-20">Carregando...</div>;
+  }
+
+  if (!user) {
+    return null;
+  }
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900 p-4">
@@ -187,9 +307,8 @@ export default function ProjectFormPage() {
               required
               value={formData.title}
               onChange={handleChange}
-              className={`w-full rounded-lg border ${
-                errors.title ? "border-red-500" : "border-gray-300 dark:border-gray-600"
-              } p-3 focus:ring-2 focus:ring-primary focus:outline-none dark:bg-gray-700 dark:text-white`}
+              className={`w-full rounded-lg border ${errors.title ? "border-red-500" : "border-gray-300 dark:border-gray-600"
+                } p-3 focus:ring-2 focus:ring-primary focus:outline-none dark:bg-gray-700 dark:text-white`}
               placeholder="Ex: Sistema de Gestão de Tarefas"
             />
             {errors.title && <p className="mt-2 text-sm text-red-600 dark:text-red-400">{errors.title}</p>}
@@ -221,11 +340,11 @@ export default function ProjectFormPage() {
             </label>
             <select
               id="status"
+              disabled={!isEditing}
               value={formData.status}
               onChange={handleChange}
-              className={`w-full rounded-lg border ${
-                errors.status ? "border-red-500" : "border-gray-300 dark:border-gray-600"
-              } p-3 focus:ring-2 focus:ring-primary focus:outline-none dark:bg-gray-700 dark:text-white`}
+              className={`w-full rounded-lg border ${errors.status ? "border-red-500" : "border-gray-300 dark:border-gray-600"
+                } p-3 focus:ring-2 focus:ring-primary focus:outline-none dark:bg-gray-700 dark:text-white`}
             >
               <option value="TO_DO">Por Fazer</option>
               <option value="IN_PROGRESS">Em Progresso</option>
@@ -241,11 +360,10 @@ export default function ProjectFormPage() {
             </label>
             <select
               id="priority"
-              value={formData.priority}
+              value={formData.priority || "medium"}
               onChange={handleChange}
-              className={`w-full rounded-lg border ${
-                errors.priority ? "border-red-500" : "border-gray-300 dark:border-gray-600"
-              } p-3 focus:ring-2 focus:ring-primary focus:outline-none dark:bg-gray-700 dark:text-white`}
+              className={`w-full rounded-lg border ${errors.priority ? "border-red-500" : "border-gray-300 dark:border-gray-600"
+                } p-3 focus:ring-2 focus:ring-primary focus:outline-none dark:bg-gray-700 dark:text-white`}
             >
               <option value="low">Baixa</option>
               <option value="medium">Média</option>
@@ -267,7 +385,7 @@ export default function ProjectFormPage() {
               <input
                 id="startDate"
                 type="date"
-                value={formData.startDate}
+                value={typeof formData.startDate === 'string' ? formData.startDate : ''}
                 onChange={handleChange}
                 className="w-full rounded-lg border border-gray-300 dark:border-gray-600 p-3 focus:ring-2 focus:ring-primary focus:outline-none dark:bg-gray-700 dark:text-white"
               />
@@ -284,18 +402,17 @@ export default function ProjectFormPage() {
               <input
                 id="endDate"
                 type="date"
-                value={formData.endDate}
+                value={typeof formData.endDate === 'string' ? formData.endDate : ''}
                 onChange={handleChange}
-                min={formData.startDate}
-                className={`w-full rounded-lg border ${
-                  errors.endDate ? "border-red-500" : "border-gray-300 dark:border-gray-600"
-                } p-3 focus:ring-2 focus:ring-primary focus:outline-none dark:bg-gray-700 dark:text-white`}
+                min={typeof formData.startDate === 'string' ? formData.startDate : ''}
+                className={`w-full rounded-lg border ${errors.endDate ? "border-red-500" : "border-gray-300 dark:border-gray-600"
+                  } p-3 focus:ring-2 focus:ring-primary focus:outline-none dark:bg-gray-700 dark:text-white`}
               />
               {errors.endDate && <p className="mt-2 text-sm text-red-600 dark:text-red-400">{errors.endDate}</p>}
             </div>
           </div>
 
-          {/* Membros */}
+          {/* Campo de membros */}
           <div>
             <label
               htmlFor="members"
@@ -304,27 +421,52 @@ export default function ProjectFormPage() {
               <FiUser size={16} />
               Membros da Equipe
             </label>
-            <input
-              id="members"
-              type="text"
-              value={membersInput}
-              onChange={handleMembersChange}
-              placeholder="Ex: joao@empresa.com, maria@empresa.com"
-              className="w-full rounded-lg border border-gray-300 dark:border-gray-600 p-3 focus:ring-2 focus:ring-primary focus:outline-none dark:bg-gray-700 dark:text-white"
-            />
-            <div className="mt-2 flex flex-wrap gap-2">
-              {formData.members.map((member, index) => (
-                <span key={index} className="px-3 py-1 bg-gray-100 dark:bg-gray-700 rounded-full text-sm">
-                  {member}
-                </span>
-              ))}
+            
+            <div className="flex gap-2">
+              <input
+                id="members"
+                type="email"
+                value={emailInput}
+                onChange={(e) => setEmailInput(e.target.value)}
+                placeholder="Digite o email do membro"
+                className="flex-1 rounded-lg border border-gray-300 dark:border-gray-600 p-3 focus:ring-2 focus:ring-primary focus:outline-none dark:bg-gray-700 dark:text-white"
+              />
+              <button
+                type="button"
+                onClick={handleAddMember}
+                disabled={isSearching}
+                className="px-4 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
+              >
+                {isSearching ? "Verificando..." : "Adicionar"}
+              </button>
             </div>
-            <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
-              Separe os e-mails por vírgulas. Membros adicionados: {formData.members.length}
-            </p>
+
+            {/* Membros adicionados */}
+            {formData.members.length > 0 && (
+              <div className="mt-3">
+                <p className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Membros adicionados:</p>
+                <div className="flex flex-wrap gap-2">
+                  {formData.members.map((member, index) => (
+                    <div
+                      key={index}
+                      className="px-3 py-1 bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-200 rounded-full text-sm flex items-center"
+                    >
+                      {member}
+                      <button
+                        type="button"
+                        onClick={() => removeMember(member)}
+                        className="ml-2 text-blue-500 hover:text-blue-700 dark:hover:text-blue-300"
+                      >
+                        <X size={14} />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
 
-          {/* Botão de submit */}
+          {/* Botões de ação */}
           <div className="flex justify-end gap-4 pt-4">
             <button
               type="button"

@@ -82,7 +82,7 @@ export default function Header({ onUserMenu }: { onUserMenu?: () => void }) {
     if (user?.uid) {
       const q = query(
         collection(db, "notifications"),
-        where("userId", "==", user.uid),
+        where("recipientEmail", "==", user.email),
         where("read", "==", false)
       );
       const unsubscribe = onSnapshot(q, (snapshot) => {
@@ -108,11 +108,14 @@ export default function Header({ onUserMenu }: { onUserMenu?: () => void }) {
   // Carregar notificações em tempo real
   useEffect(() => {
     if (user?.uid) {
+      console.log(user)
+
       const q = query(
         collection(db, "notifications"),
-        where("userId", "==", user.uid),
+        where("recipientEmail", "==", user.email),
         where("read", "==", false)
       );
+      console.log(q)
       const unsubscribe = onSnapshot(q, (snapshot) => {
         const notifs = snapshot.docs.map(doc => ({
           id: doc.id,
@@ -210,7 +213,7 @@ export default function Header({ onUserMenu }: { onUserMenu?: () => void }) {
           >
             {darkMode ? <FiSun size={18} /> : <FiMoon size={18} />}
           </motion.button>
-           {/* Dropdown de Notificações */}
+          {/* Dropdown de Notificações */}
           <div className="relative" ref={notificationsRef}>
             <motion.div
               whileHover={{ scale: 1.1, rotate: 5 }}
@@ -242,14 +245,14 @@ export default function Header({ onUserMenu }: { onUserMenu?: () => void }) {
                   <div className="p-3 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center">
                     <h3 className="font-semibold text-gray-800 dark:text-white">Notificações</h3>
                     <div className="flex gap-2">
-                      <button 
+                      <button
                         onClick={markAllAsRead}
                         className="text-xs text-blue-600 dark:text-blue-400 hover:underline"
                         disabled={unreadCount === 0}
                       >
                         Marcar todas como lidas
                       </button>
-                      <button 
+                      <button
                         onClick={() => setShowAllNotifications(false)}
                         className="text-gray-500 hover:text-gray-700 dark:hover:text-gray-300"
                       >
@@ -261,7 +264,7 @@ export default function Header({ onUserMenu }: { onUserMenu?: () => void }) {
                   <div className="max-h-96 overflow-y-auto">
                     {displayedNotifications.length > 0 ? (
                       displayedNotifications.map((notification) => (
-                        <div 
+                        <div
                           key={notification.id}
                           className={`p-3 border-b border-gray-100 dark:border-gray-700 ${notification.read ? 'bg-gray-50 dark:bg-gray-700/50' : 'bg-white dark:bg-gray-800'}`}
                         >

@@ -1,13 +1,15 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
 import { collection, onSnapshot, updateDoc, doc, Timestamp } from "firebase/firestore";
-import { db } from "@/firebase/config";
+import { db, auth } from "@/firebase/config";
+import { useAuthState } from "react-firebase-hooks/auth";
 import { DndProvider, useDrag, useDrop } from "react-dnd";
 import { HTML5Backend } from "react-dnd-html5-backend";
 import { toast } from "sonner";
 import { motion, AnimatePresence } from "framer-motion";
 import { FiPlus, FiMoreVertical, FiCheck, FiClock, FiPlay, FiArchive, FiPieChart, FiTrendingUp, FiAlertTriangle } from "react-icons/fi";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { Chart as ChartJS, ArcElement, BarElement, CategoryScale, LinearScale, Tooltip, Legend } from "chart.js";
 import { Pie, Bar } from "react-chartjs-2";
 
@@ -19,10 +21,13 @@ type Project = {
   title: string;
   description: string;
   status: "TO_DO" | "IN_PROGRESS" | "DONE";
-  createdAt?: Date;
-  priority?: "low" | "medium" | "high";
-  startDate?: Date;
-  endDate?: Date;
+  createdAt: Date;
+  priority: "low" | "medium" | "high";
+  startDate: Date;
+  endDate: Date;
+  owner: string;
+  members: string[];
+  role: "Owner" | "Participant";
 };
 
 // Componente: Card de Estatística
@@ -99,11 +104,16 @@ const ProjectCard = ({ project, moveProject, updatePriority }: { project: Projec
           <h3 className="font-semibold text-gray-900 dark:text-white line-clamp-1">
             {project.title || "Sem título"}
           </h3>
-          {project.priority && (
-            <span className={`text-xs px-2 py-1 rounded-full ${priorityColors[project.priority]}`}>
-              {project.priority === "high" ? "Alta" : project.priority === "medium" ? "Média" : "Baixa"}
+          <div className="flex items-center gap-2">
+            <span className="text-xs px-2 py-1 rounded-full bg-blue-100 text-blue-800">
+              {project.role === "Owner" ? "Dono" : "Participante"}
             </span>
-          )}
+            {project.priority && (
+              <span className={`text-xs px-2 py-1 rounded-full ${priorityColors[project.priority]}`}>
+                {project.priority === "high" ? "Alta" : project.priority === "medium" ? "Média" : "Baixa"}
+              </span>
+            )}
+          </div>
         </div>
         <p className="mt-2 text-sm text-gray-600 dark:text-gray-400 line-clamp-2">
           {project.description || "Sem descrição"}
@@ -233,35 +243,54 @@ const ProjectColumn = ({
 export default function DashboardPage() {
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
+  const [user, loadingAuth] = useAuthState(auth);
+  const router = useRouter();
 
   useEffect(() => {
-    const unsubscribe = onSnapshot(collection(db, "projects"), (snapshot) => {
-      const projectsData = snapshot.docs.map((doc) => {
+  if (loadingAuth) return;
+  if (!user) {
+    router.push("/auth/login");
+    return;
+  }
+
+  const unsubscribe = onSnapshot(collection(db, "projects"), (snapshot) => {
+    const projectsData: any = snapshot.docs
+      .map((doc) => {
         const data = doc.data();
         const validStatus = ["TO_DO", "IN_PROGRESS", "DONE"].includes(data.status) ? data.status : "TO_DO";
-        // Convert string dates to Date objects
         const parseDate = (date: any): Date | undefined => {
           if (date instanceof Timestamp) return date.toDate();
           if (typeof date === "string" && date) return new Date(date);
           return undefined;
         };
+        const priority = ["low", "medium", "high"].includes(data.priority) ? data.priority : undefined;
+        const isOwner = data.owner === user.uid;
+        const isMember = (data.members || []).includes(user.email); // Alterado para verificar por email
+        const role = isOwner ? "Owner" : isMember ? "Participant" : null;
+
+        if (!role) return null;
+
         return {
           id: doc.id,
           title: data.title || "",
           description: data.description || "",
           status: validStatus as Project["status"],
-          priority: ["low", "medium", "high"].includes(data.priority) ? data.priority : "medium",
+          priority,
           createdAt: parseDate(data.createdAt),
           startDate: parseDate(data.startDate),
           endDate: parseDate(data.endDate),
+          owner: data.owner || "",
+          members: data.members || [],
+          role: role as "Owner" | "Participant",
         };
-      });
-      setProjects(projectsData);
-      setLoading(false);
-    });
+      })
+      .filter((project): project is Project => project !== null);
+    setProjects(projectsData);
+    setLoading(false);
+  });
 
-    return () => unsubscribe();
-  }, []);
+  return () => unsubscribe();
+}, [user, loadingAuth, router]);
 
   const moveProject = async (id: string, newStatus: Project["status"]) => {
     try {
@@ -319,12 +348,16 @@ export default function DashboardPage() {
       };
     });
 
-  if (loading) {
+  if (loading || loadingAuth) {
     return (
       <div className="flex items-center justify-center h-screen">
         <div className="animate-pulse text-gray-500">Carregando projetos...</div>
       </div>
     );
+  }
+
+  if (!user) {
+    return null;
   }
 
   return (
@@ -369,7 +402,7 @@ export default function DashboardPage() {
               icon={<FiPlay className="text-yellow-500" size={20} />}
               title="Em Progresso"
               value={stats.inProgress}
-              color="bg-yellow-50 dark:bg-yellow-900/20"
+              color="bg-yellow-50 dark:bg-green-900/20"
             />
             <StatCard
               icon={<FiAlertTriangle className="text-red-500" size={20} />}

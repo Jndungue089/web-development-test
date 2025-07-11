@@ -23,7 +23,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
       if (!currentUser) {
-        router.push("/auth");
+        router.push("/auth/login");
         toast.error("Sessão expirada. Faça login novamente.");
       } else {
         setUser({
@@ -41,7 +41,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const handleSignOut = async () => {
     try {
       await signOut(auth);
-      router.push("/auth");
+      router.push("/auth/login");
       toast.info("Você saiu com sucesso.");
     } catch (error) {
       toast.error("Erro ao sair. Tente novamente.");

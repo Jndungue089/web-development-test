@@ -2,7 +2,21 @@
 import { motion } from "framer-motion";
 import { FiMail, FiPhone, FiMapPin, FiSend, FiCheckCircle, FiAlertCircle, FiLoader } from "react-icons/fi";
 import { useReducer, useCallback } from "react";
-import { useForm } from "react-hook-form";
+import { SubmitHandler, useForm } from "react-hook-form";
+import { addDoc, collection, serverTimestamp } from "firebase/firestore";
+import { toast } from "sonner";
+import { useAuthState } from "react-firebase-hooks/auth";
+import { auth, db } from "@/firebase/config";
+
+// Define form data interface
+interface FormData {
+  name: string;
+  email: string;
+  subject: string;
+  message: string;
+  userId?: string;
+  createdAt?: any; // Firestore server timestamp
+}
 
 type FormState = {
   isLoading: boolean;
@@ -33,42 +47,45 @@ const formReducer = (state: FormState, action: FormAction): FormState => {
 };
 
 export function ContactSection() {
-  const { register, handleSubmit, formState: { errors }, reset } = useForm();
+  const { register, handleSubmit, formState: { errors }, reset } = useForm<FormData>();
+  const [user] = useAuthState(auth);
   const [state, dispatch] = useReducer(formReducer, {
     isLoading: false,
     isSuccess: false,
     isError: false,
   });
 
-  const onSubmit = useCallback(async (data: any) => {
-    dispatch({ type: "SUBMIT" });
-    try {
-      // Simulated API call (replace with your actual endpoint)
-      const response = await fetch("https://jsonplaceholder.typicode.com/posts", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(data),
-      });
+  const onSubmit: SubmitHandler<FormData> = useCallback(
+    async (data) => {
+      dispatch({ type: "SUBMIT" });
+      try {
+        if (!user) {
+          throw new Error("Usuário não autenticado.");
+        }
 
-      if (!response.ok) {
-        throw new Error("Falha ao enviar a mensagem.");
+        // Save to Firestore
+        await addDoc(collection(db, "messages"), {
+          name: data.name,
+          email: data.email,
+          subject: data.subject,
+          message: data.message,
+          userId: user.uid,
+          createdAt: serverTimestamp(),
+        });
+
+        dispatch({ type: "SUCCESS" });
+        toast.success("Mensagem enviada com sucesso!");
+        reset();
+        setTimeout(() => dispatch({ type: "RESET" }), 3000);
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : "Erro ao enviar a mensagem. Tente novamente.";
+        dispatch({ type: "ERROR", errorMessage });
+        toast.error(errorMessage);
+        setTimeout(() => dispatch({ type: "RESET" }), 3000);
       }
-
-      const result = await response.json();
-      console.log("Dados enviados:", result);
-      dispatch({ type: "SUCCESS" });
-      reset();
-      setTimeout(() => dispatch({ type: "RESET" }), 3000);
-    } catch (error) {
-      dispatch({
-        type: "ERROR",
-        errorMessage: error instanceof Error ? error.message : "Erro ao enviar a mensagem. Tente novamente.",
-      });
-      setTimeout(() => dispatch({ type: "RESET" }), 3000);
-    }
-  }, [reset]);
+    },
+    [user, reset]
+  );
 
   return (
     <section id="contact" className="py-20 px-4 sm:px-6 lg:px-8 bg-gray-50 dark:bg-gray-900">

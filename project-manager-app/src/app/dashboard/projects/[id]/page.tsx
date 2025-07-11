@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { doc, getDoc, deleteDoc, collection, getDocs, onSnapshot, updateDoc } from "firebase/firestore";
+import { doc, getDoc, deleteDoc, collection, getDocs, onSnapshot, updateDoc, Timestamp } from "firebase/firestore";
 import { db } from "@/firebase/config";
 import { motion, AnimatePresence } from "framer-motion";
 import { FiTrash2, FiPlus, FiCalendar, FiUser, FiPieChart, FiList, FiClock, FiAlertTriangle, FiEdit } from "react-icons/fi";
@@ -34,12 +34,14 @@ type Project = {
   id: string;
   title: string;
   description: string;
-  startDate: string;
-  endDate: string;
-  members: string[];
-  createdAt: Date;
+  status: "TO_DO" | "IN_PROGRESS" | "DONE";
+  createdAt: Timestamp;
+  priority: "low" | "medium" | "high";
+  startDate: Timestamp;
+  endDate: Timestamp;
   owner: string;
-  tags?: string[];
+  members: string[];
+  role: "Owner" | "Participant";
 };
 
 export default function ProjectDetailPage() {
@@ -60,7 +62,7 @@ export default function ProjectDetailPage() {
     const fetchProject = async () => {
       const docRef = doc(db, "projects", id as string);
       const docSnap = await getDoc(docRef);
-      
+
       if (docSnap.exists()) {
         const projectData = docSnap.data() as Project;
         setProject({ ...projectData, id: docSnap.id });
@@ -90,7 +92,7 @@ export default function ProjectDetailPage() {
             dueDate: data.dueDate,
             completedAt: data.completedAt,
             assignedTo: data.assignedTo || [],
-            createdAt: data.createdAt.toDate(),
+            createdAt: data.createdAt,
             priority: data.priority || 'medium'
           } as Task;
         });
@@ -113,12 +115,12 @@ export default function ProjectDetailPage() {
   const handleDeleteProject = async () => {
     if (!id) return;
     if (!confirm("Tem certeza que deseja excluir este projeto e todas as suas tarefas?")) return;
-    
+
     try {
       const tasksSnapshot = await getDocs(collection(db, "projects", id as string, "tasks"));
       const deletePromises = tasksSnapshot.docs.map(doc => deleteDoc(doc.ref));
       await Promise.all(deletePromises);
-      
+
       await deleteDoc(doc(db, "projects", id as string));
       toast.success("Projeto excluído com sucesso!");
       router.push("/dashboard");
@@ -130,18 +132,18 @@ export default function ProjectDetailPage() {
 
   const handleTaskStatusChange = async (taskId: string, newStatus: Task['status']) => {
     if (!id) return;
-    
+
     try {
       const taskRef = doc(db, "projects", id as string, "tasks", taskId);
       const taskData = tasks.find(t => t.id === taskId);
-      
+
       if (!taskData) return;
 
       const updates: Partial<Task> = { status: newStatus };
 
       if (newStatus === 'completed') {
         updates.completedAt = new Date().toISOString();
-        
+
         if (taskData.dueDate && new Date() > new Date(taskData.dueDate)) {
           toast.warning("Tarefa concluída após o prazo!");
           updates.status = 'overdue';
@@ -174,7 +176,8 @@ export default function ProjectDetailPage() {
             <div className="flex items-center text-sm text-gray-500 dark:text-gray-400 mt-1">
               <FiCalendar className="mr-1" />
               <span>
-                {new Date(project.startDate).toLocaleDateString()} - {new Date(project.endDate).toLocaleDateString()}
+                {project.startDate?.toDate().toLocaleDateString("pt-PT")} -
+                {project.endDate?.toDate().toLocaleDateString("pt-PT")}
               </span>
             </div>
           </div>
@@ -305,7 +308,7 @@ export default function ProjectDetailPage() {
               <div className="flex justify-between items-center">
                 <h2 className="text-xl font-semibold dark:text-white">Membros da Equipe</h2>
                 <button
-                  onClick={() => {}}
+                  onClick={() => { }}
                   className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
                 >
                   <FiPlus size={16} />
@@ -334,12 +337,12 @@ export default function ProjectDetailPage() {
           {activeTab === 'timeline' && (
             <div className="space-y-6">
               <h2 className="text-xl font-semibold dark:text-white">Cronograma do Projeto</h2>
-              
+
               <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow border border-gray-200 dark:border-gray-700">
                 <div className="flex items-center justify-between mb-4">
                   <h3 className="font-medium dark:text-white">Datas Importantes</h3>
                 </div>
-                
+
                 <div className="space-y-4">
                   <div className="flex items-start">
                     <div className="p-2 rounded-lg bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 mr-3">
@@ -348,7 +351,7 @@ export default function ProjectDetailPage() {
                     <div>
                       <h4 className="font-medium dark:text-white">Início do Projeto</h4>
                       <p className="text-sm text-gray-600 dark:text-gray-400">
-                        {new Date(project.startDate).toLocaleDateString('pt-BR', {
+                        {project.startDate?.toDate().toLocaleDateString("pt-PT", {
                           day: '2-digit',
                           month: 'long',
                           year: 'numeric'
@@ -356,7 +359,7 @@ export default function ProjectDetailPage() {
                       </p>
                     </div>
                   </div>
-                  
+
                   <div className="flex items-start">
                     <div className="p-2 rounded-lg bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 mr-3">
                       <FiCalendar />
@@ -364,7 +367,7 @@ export default function ProjectDetailPage() {
                     <div>
                       <h4 className="font-medium dark:text-white">Prazo Final</h4>
                       <p className="text-sm text-gray-600 dark:text-gray-400">
-                        {new Date(project.endDate).toLocaleDateString('pt-BR', {
+                        {project.endDate?.toDate().toLocaleDateString("pt-PT", {
                           day: '2-digit',
                           month: 'long',
                           year: 'numeric'
@@ -374,7 +377,7 @@ export default function ProjectDetailPage() {
                   </div>
                 </div>
               </div>
-              
+
               <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow border border-gray-200 dark:border-gray-700">
                 <h3 className="font-medium mb-4 dark:text-white">Tarefas com Prazo</h3>
                 {tasks.filter(t => t.dueDate).length > 0 ? (
@@ -387,14 +390,13 @@ export default function ProjectDetailPage() {
                           <div>
                             <h4 className="font-medium dark:text-white">{task.title}</h4>
                             <p className="text-sm text-gray-600 dark:text-gray-400">
-                              Prazo: {new Date(task.dueDate!).toLocaleDateString('pt-BR')}
+                              Prazo: {task.dueDate}
                             </p>
                           </div>
-                          <span className={`px-2 py-1 text-xs rounded-full ${
-                            task.status === 'completed' ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400' :
-                            new Date() > new Date(task.dueDate!) ? 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400' :
-                            'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400'
-                          }`}>
+                          <span className={`px-2 py-1 text-xs rounded-full ${task.status === 'completed' ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400' :
+                              new Date() > new Date(task.dueDate!) ? 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400' :
+                                'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400'
+                            }`}>
                             {task.status === 'completed' ? 'Concluída' : new Date() > new Date(task.dueDate!) ? 'Atrasada' : 'Pendente'}
                           </span>
                         </div>
@@ -520,9 +522,8 @@ const TaskCard = ({
       whileTap={{ scale: 0.98 }}
       transition={{ type: "spring", stiffness: 400, damping: 17 }}
       onClick={onClick}
-      className={`p-4 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 cursor-pointer transition ${
-        isDragging ? 'opacity-50 shadow-lg' : ''
-      } ${isOverdue ? 'border-l-4 border-l-red-500' : ''}`}
+      className={`p-4 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 cursor-pointer transition ${isDragging ? 'opacity-50 shadow-lg' : ''
+        } ${isOverdue ? 'border-l-4 border-l-red-500' : ''}`}
     >
       <div className="flex justify-between items-start">
         <h4 className="font-medium">{task.title}</h4>
