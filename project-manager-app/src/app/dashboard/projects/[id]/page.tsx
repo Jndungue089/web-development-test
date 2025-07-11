@@ -1,15 +1,16 @@
 "use client";
 import { useEffect, useState, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { doc, getDoc, updateDoc, deleteDoc, collection, addDoc, onSnapshot, serverTimestamp, getDocs } from "firebase/firestore";
+import { doc, getDoc, deleteDoc, collection, getDocs, onSnapshot, updateDoc } from "firebase/firestore";
 import { db } from "@/firebase/config";
 import { motion, AnimatePresence } from "framer-motion";
-import { FiEdit, FiTrash2, FiPlus, FiCalendar, FiUser, FiMessageSquare, FiCheck, FiAlertTriangle, FiClock, FiPieChart, FiList } from "react-icons/fi";
+import { FiTrash2, FiPlus, FiCalendar, FiUser, FiPieChart, FiList, FiClock, FiAlertTriangle, FiEdit } from "react-icons/fi";
 import { toast } from "sonner";
 import { DndProvider, useDrag, useDrop } from "react-dnd";
 import { HTML5Backend } from "react-dnd-html5-backend";
 import dynamic from "next/dynamic";
 import ProgressBar from "@/components/ProgressBar";
+import Link from "next/link";
 
 // Carregar componentes dinamicamente
 const TaskModal = dynamic(() => import('./TaskModal'), { ssr: false });
@@ -47,7 +48,6 @@ export default function ProjectDetailPage() {
   const [project, setProject] = useState<Project | null>(null);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(true);
-  const [editMode, setEditMode] = useState(false);
   const [showTaskModal, setShowTaskModal] = useState(false);
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [allUsers, setAllUsers] = useState<string[]>([]);
@@ -63,7 +63,7 @@ export default function ProjectDetailPage() {
       
       if (docSnap.exists()) {
         const projectData = docSnap.data() as Project;
-        setProject({ ...projectData });
+        setProject({ ...projectData, id: docSnap.id });
       }
       setLoading(false);
     };
@@ -108,19 +108,6 @@ export default function ProjectDetailPage() {
     progress: tasks.length > 0 ? Math.round((tasks.filter(t => t.status === 'completed').length / tasks.length) * 100) : 0,
     overdueTasks: tasks.filter(t => t.dueDate && new Date() > new Date(t.dueDate) && t.status !== 'completed').length,
     highPriorityTasks: tasks.filter(t => t.priority === 'high').length,
-  };
-
-  const handleUpdateProject = async (updatedData: Partial<Project>) => {
-    if (!id) return;
-    try {
-      await updateDoc(doc(db, "projects", id as string), updatedData);
-      setProject(prev => prev ? { ...prev, ...updatedData } : null);
-      setEditMode(false);
-      toast.success("Projeto atualizado com sucesso!");
-    } catch (error) {
-      toast.error("Erro ao atualizar projeto");
-      console.error("Error updating project:", error);
-    }
   };
 
   const handleDeleteProject = async () => {
@@ -183,16 +170,7 @@ export default function ProjectDetailPage() {
         {/* Cabeçalho do Projeto */}
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
           <div>
-            {editMode ? (
-              <input
-                type="text"
-                value={project.title}
-                onChange={(e) => setProject({ ...project, title: e.target.value })}
-                className="text-3xl font-bold bg-transparent border-b border-gray-300 dark:border-gray-600 focus:outline-none focus:border-blue-500 dark:bg-gray-800 dark:text-white"
-              />
-            ) : (
-              <h1 className="text-3xl font-bold dark:text-white">{project.title}</h1>
-            )}
+            <h1 className="text-3xl font-bold dark:text-white">{project.title}</h1>
             <div className="flex items-center text-sm text-gray-500 dark:text-gray-400 mt-1">
               <FiCalendar className="mr-1" />
               <span>
@@ -202,13 +180,13 @@ export default function ProjectDetailPage() {
           </div>
 
           <div className="flex gap-2">
-            <button
-              onClick={() => setEditMode(!editMode)}
+            <Link
+              href={`/dashboard/projects/edit/${id}`}
               className="flex items-center gap-2 px-4 py-2 bg-gray-100 dark:bg-gray-700 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition"
             >
               <FiEdit size={16} />
-              {editMode ? "Cancelar" : "Editar Projeto"}
-            </button>
+              Editar Projeto
+            </Link>
             <button
               onClick={handleDeleteProject}
               className="flex items-center gap-2 px-4 py-2 bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 rounded-lg hover:bg-red-200 dark:hover:bg-red-900/50 transition"
@@ -290,16 +268,7 @@ export default function ProjectDetailPage() {
               {/* Descrição do Projeto */}
               <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow border border-gray-200 dark:border-gray-700">
                 <h2 className="text-lg font-semibold mb-4 dark:text-white">Descrição do Projeto</h2>
-                {editMode ? (
-                  <textarea
-                    value={project.description}
-                    onChange={(e) => setProject({ ...project, description: e.target.value })}
-                    className="w-full p-3 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                    rows={4}
-                  />
-                ) : (
-                  <p className="text-gray-700 dark:text-gray-300 whitespace-pre-line">{project.description}</p>
-                )}
+                <p className="text-gray-700 dark:text-gray-300 whitespace-pre-line">{project.description}</p>
               </div>
             </div>
           )}
@@ -459,7 +428,6 @@ export default function ProjectDetailPage() {
     </DndProvider>
   );
 }
-
 
 // Componente de Coluna de Tarefas
 const TaskColumn = ({
