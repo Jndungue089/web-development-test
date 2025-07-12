@@ -51,17 +51,13 @@ export function HeroSection() {
             className="flex flex-col sm:flex-row justify-center gap-4"
           >
             <button
-              onClick={() => router.push("/signup")}
+            data-testid="cta-signup"
+              onClick={() => router.push("/auth/register")}
               className="px-6 py-3 bg-gradient-to-r from-blue-600 to-blue-500 text-white rounded-lg font-medium hover:from-blue-700 hover:to-blue-600 transition-all shadow-lg hover:shadow-blue-500/20 flex items-center justify-center"
             >
               Comece gratuitamente <FiArrowRight className="ml-2" />
             </button>
-            <button
-              onClick={() => router.push("/demo")}
-              className="px-6 py-3 border border-gray-300 dark:border-gray-700 text-gray-700 dark:text-gray-300 rounded-lg font-medium hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors flex items-center justify-center"
-            >
-              <FiBarChart2 className="mr-2" /> Ver demonstração
-            </button>
+          
           </motion.div>
 
           {/* Destaques */}
@@ -85,6 +81,7 @@ export function HeroSection() {
 
         {/* App Mockup */}
         <motion.div
+        data-testid="hero-mockup"
           initial={{ opacity: 0, scale: 0.9 }}
           animate={{ opacity: 1, scale: 1 }}
           transition={{ duration: 0.5, delay: 1 }}
@@ -95,10 +92,12 @@ export function HeroSection() {
               <div className="w-16 h-16 bg-blue-100 dark:bg-blue-900 rounded-xl flex items-center justify-center mx-auto mb-6">
                 <FiBarChart2 className="text-blue-600 dark:text-blue-400" size={24} />
               </div>
-              <h3 className="text-xl font-semibold text-gray-800 dark:text-white mb-2">
+              <h3 className="text-xl font-semibold text-gray-800 dark:text-white mb-2"
+              data-testid="mockup-title">
                 Dashboard PMS
               </h3>
-              <p className="text-gray-500 dark:text-gray-400">
+              <p className="text-gray-500 dark:text-gray-400"
+              data-testid="mockup-subtitle">
                 Visualização do painel de controle
               </p>
             </div>

@@ -26,6 +26,7 @@ export default function ProgressBar({
         style={{ height: `${height}px` }}
       >
         <motion.div
+        role="progressbar"
           initial={{ width: 0 }}
           animate={{ width: `${progress}%` }}
           transition={{ duration: 0.8, ease: "easeOut" }}

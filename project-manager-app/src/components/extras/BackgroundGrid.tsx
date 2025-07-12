@@ -26,6 +26,7 @@ export function BackgroundGrid() {
 
   return (
     <div 
+    data-testid="background-grid"
       ref={gridRef}
       className="fixed inset-0 -z-10 overflow-hidden pointer-events-none"
       style={{
