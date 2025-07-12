@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { FiMail, FiLock, FiArrowRight, FiAlertCircle, FiLoader, FiGrid } from "react-icons/fi";
 import { FcGoogle } from "react-icons/fc";
 import Link from "next/link";
-import { Navbar } from "@/components/Navbar";
+import Navbar from "@/components/Navbar";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");

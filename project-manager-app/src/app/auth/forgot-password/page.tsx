@@ -5,7 +5,7 @@ import { auth } from "@/firebase/config";
 import { useRouter } from "next/navigation";
 import { FiMail, FiArrowRight, FiCheckCircle, FiAlertCircle, FiLoader } from "react-icons/fi";
 import Link from "next/link";
-import { Navbar } from "@/components/Navbar";
+import Navbar from "@/components/Navbar";
 
 export default function ForgotPasswordPage() {
     const [email, setEmail] = useState("");
