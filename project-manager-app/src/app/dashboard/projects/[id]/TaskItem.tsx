@@ -5,71 +5,110 @@ import { db } from "@/firebase/config";
 import CommentForm from "./CommentForm";
 import CommentList from "./CommentList";
 
-type Task = {
+interface Task {
   id: string;
   title: string;
   description: string;
-  notes?: string;
   status: 'pending' | 'in_progress' | 'completed' | 'overdue';
-  dueDate?: string;
-  completedAt?: string;
-  assignedTo?: string[];
-  createdAt: Date;
-  priority?: 'low' | 'medium' | 'high';
-};
+  // ... outros campos
+}
 
-export default function TaskItem({ projectId, task, onStatusChange, onDelete }: {
+interface TaskItemProps {
   projectId: string;
   task: Task;
   onStatusChange: () => void;
   onDelete: () => void;
-}) {
-  const [loading, setLoading] = useState(false);
-  const [refreshComments, setRefreshComments] = useState(false);
+}
 
-  const handleStatus = async (status: string) => {
+export default function TaskItem({ projectId, task, onStatusChange, onDelete }: TaskItemProps) {
+  const [loading, setLoading] = useState(false);
+  const [commentRefreshKey, setCommentRefreshKey] = useState(0);
+  const [commentsRefreshed, setCommentsRefreshed] = useState(false);
+
+  const handleStatusChange = async (newStatus: Task['status']) => {
     setLoading(true);
-    await updateDoc(doc(db, "projects", projectId, "tasks", task.id), { status });
-    setLoading(false);
-    onStatusChange();
+    try {
+      await updateDoc(doc(db, "projects", projectId, "tasks", task.id), { 
+        status: newStatus 
+      });
+      onStatusChange();
+    } catch (error) {
+      console.error("Error updating task status:", error);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleDelete = async () => {
-    if (!confirm("Excluir esta tarefa?")) return;
+    if (!confirm("Tem certeza que deseja excluir esta tarefa?")) return;
     setLoading(true);
-    await deleteDoc(doc(db, "projects", projectId, "tasks", task.id));
-    setLoading(false);
-    onDelete();
+    try {
+      await deleteDoc(doc(db, "projects", projectId, "tasks", task.id));
+      onDelete();
+    } catch (error) {
+      console.error("Error deleting task:", error);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
-    <li className="p-3 bg-white rounded shadow flex flex-col gap-2">
-      <div className="flex items-center justify-between gap-4">
+    <div className="bg-white rounded-lg shadow p-4 mb-4 border border-gray-200">
+      <div className="flex justify-between items-start">
         <div>
-          <div className="font-semibold">{task.title}</div>
-          <div className="text-sm text-gray-600">{task.description}</div>
-          <div className="text-xs text-gray-400">Status: {task.status}</div>
+          <h3 className="font-semibold text-lg">{task.title}</h3>
+          <p className="text-gray-600">{task.description}</p>
+          <span className={`inline-block mt-1 px-2 py-1 text-xs rounded-full ${
+            task.status === 'completed' ? 'bg-green-100 text-green-800' :
+            task.status === 'in_progress' ? 'bg-blue-100 text-blue-800' :
+            'bg-gray-100 text-gray-800'
+          }`}>
+            {task.status === 'completed' ? 'Concluída' :
+             task.status === 'in_progress' ? 'Em progresso' : 'Pendente'}
+          </span>
         </div>
-        <div className="flex gap-2 items-center">
+
+        <div className="flex gap-2">
+          {task.status !== 'completed' && (
+            <button
+              onClick={() => handleStatusChange('completed')}
+              disabled={loading}
+              className="px-3 py-1 bg-green-500 text-white rounded hover:bg-green-600 disabled:bg-green-300"
+            >
+              Concluir
+            </button>
+          )}
+          {task.status !== 'in_progress' && task.status !== 'completed' && (
+            <button
+              onClick={() => handleStatusChange('in_progress')}
+              disabled={loading}
+              className="px-3 py-1 bg-yellow-500 text-white rounded hover:bg-yellow-600 disabled:bg-yellow-300"
+            >
+              Em progresso
+            </button>
+          )}
           <button
-            className="text-xs px-2 py-1 rounded bg-green-100 text-green-800 hover:bg-green-200"
-            disabled={loading || task.status === 'completed'}
-            onClick={() => handleStatus('concluída')}
-          >Concluir</button>
-          <button
-            className="text-xs px-2 py-1 rounded bg-yellow-100 text-yellow-800 hover:bg-yellow-200"
-            disabled={loading || task.status === 'in_progress'}
-            onClick={() => handleStatus('em progresso')}
-          >Em progresso</button>
-          <button
-            className="text-xs px-2 py-1 rounded bg-red-100 text-red-800 hover:bg-red-200"
-            disabled={loading}
             onClick={handleDelete}
-          >Excluir</button>
+            disabled={loading}
+            className="px-3 py-1 bg-red-500 text-white rounded hover:bg-red-600 disabled:bg-red-300"
+          >
+            Excluir
+          </button>
         </div>
       </div>
-      <CommentList projectId={projectId} taskId={task.id} refresh={refreshComments} />
-      <CommentForm projectId={projectId} taskId={task.id} onCommentAdded={() => setRefreshComments(r => !r)} />
-    </li>
+
+      <div className="mt-4 border-t pt-4">
+        <CommentList 
+          projectId={projectId} 
+          taskId={task.id} 
+          refresh={commentsRefreshed} 
+        />
+        <CommentForm 
+          projectId={projectId} 
+          taskId={task.id} 
+          onCommentAdded={() => setCommentsRefreshed(!commentsRefreshed)} 
+        />
+      </div>
+    </div>
   );
 }

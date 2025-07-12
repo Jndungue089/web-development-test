@@ -96,9 +96,12 @@ export function Footer() {
               <input
                 type="email"
                 placeholder="Seu email"
-                className="px-4 py-2 rounded-l-lg focus:outline-none focus:ring-2 focus:ring-blue-500 w-full text-gray-900"
-                required
+                className="px-4 py-2 rounded-l-lg w-full
+             bg-gray-800 text-white placeholder-gray-400
+             border border-gray-500 focus:border-blue-400
+             focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
+
               <button
                 type="submit"
                 className="bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded-r-lg transition-colors"
@@ -130,13 +133,13 @@ export function Footer() {
             © {new Date().getFullYear()} PMS. Todos os direitos reservados.
           </div>
           <div className="flex space-x-6">
-            <Link href="/politica-privacidade" className="hover:text-white transition-colors">
+            <Link href="#" className="hover:text-white transition-colors">
               Política de Privacidade
             </Link>
-            <Link href="/termos-servico" className="hover:text-white transition-colors">
+            <Link href="#" className="hover:text-white transition-colors">
               Termos de Serviço
             </Link>
-            <Link href="/cookies" className="hover:text-white transition-colors">
+            <Link href="#" className="hover:text-white transition-colors">
               Cookies
             </Link>
           </div>

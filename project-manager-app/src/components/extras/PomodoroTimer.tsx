@@ -1,7 +1,6 @@
-// components/PomodoroTimer.tsx
 "use client";
 import { useState, useEffect, useRef } from "react";
-import { FiCheck, FiX } from "react-icons/fi";
+import { FiCheck, FiMinimize, FiX } from "react-icons/fi";
 import { doc, updateDoc, arrayUnion, serverTimestamp } from "firebase/firestore";
 import { db, auth } from "@/firebase/config";
 import { useAuthState } from "react-firebase-hooks/auth";
@@ -10,7 +9,6 @@ import { PomodoroCounter } from "./Pomodoro/PomodoroCounter";
 import { PomodoroControls } from "./Pomodoro/PomodoroControls";
 
 type PomodoroMode = "focus" | "shortBreak" | "longBreak";
-type SoundType = "rain" | "coffee" | "forest" | "none";
 
 interface Task {
     id: string;
@@ -25,7 +23,10 @@ interface PomodoroTimerProps {
     taskTitle?: string;
 }
 
-const PomodoroTimer = ({ projectId, tasks }: PomodoroTimerProps) => {
+const PomodoroTimer = ({
+    projectId,
+    tasks,
+}: PomodoroTimerProps) => {
     const [user] = useAuthState(auth);
     const [minutes, setMinutes] = useState<number>(25);
     const [seconds, setSeconds] = useState<number>(0);
@@ -34,7 +35,9 @@ const PomodoroTimer = ({ projectId, tasks }: PomodoroTimerProps) => {
     const [completedPomodoros, setCompletedPomodoros] = useState<number>(0);
     const [selectedTask, setSelectedTask] = useState<Task | null>(null);
     const [showTaskSelector, setShowTaskSelector] = useState<boolean>(true);
+    const [isMinimized, setIsMinimized] = useState(false);
     const intervalRef = useRef<NodeJS.Timeout | null>(null);
+
     // Settings
     const settings = {
         focus: 25,
@@ -184,55 +187,56 @@ const PomodoroTimer = ({ projectId, tasks }: PomodoroTimerProps) => {
         });
     };
 
+
     return (
-        <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-lg border border-gray-200 dark:border-gray-700">
+        <div className={`bg-white dark:bg-gray-800 rounded-lg md:rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 p-4 sm:p-6 w-full max-w-md mx-auto`}>
             {showTaskSelector ? (
-                <div className="space-y-4">
-                    <h3 className="text-lg font-semibold dark:text-white">Selecione uma tarefa para focar</h3>
+                <div className="space-y-3 sm:space-y-4">
+                    <h3 className="text-base sm:text-lg font-semibold dark:text-white">Selecione uma tarefa para focar</h3>
                     {incompleteTasks.length > 0 ? (
-                        <div className="space-y-2">
+                        <div className="space-y-2 max-h-60 overflow-y-auto">
                             {incompleteTasks.map(task => (
                                 <button
                                     key={task.id}
                                     onClick={() => handleTaskSelect(task)}
-                                    className="w-full p-3 text-left rounded-lg bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 transition"
+                                    className="w-full p-2 sm:p-3 text-left rounded-lg bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 transition text-sm sm:text-base"
                                 >
-                                    {task.title}
+                                    <span className="line-clamp-1">{task.title}</span>
                                 </button>
                             ))}
                         </div>
                     ) : (
-                        <p className="text-gray-500 dark:text-gray-400">Nenhuma tarefa pendente</p>
+                        <p className="text-gray-500 dark:text-gray-400 text-sm sm:text-base">Nenhuma tarefa pendente</p>
                     )}
                 </div>
             ) : (
                 <>
-                    <div className="flex justify-between items-start mb-4">
-                        <div>
-                            <h3 className="font-medium text-gray-700 dark:text-gray-300">Tarefa atual:</h3>
-                            <p className="text-lg font-semibold dark:text-white">{selectedTask?.title}</p>
+                    <div className="flex justify-between items-start mb-3 sm:mb-4">
+                        <div className="max-w-[80%]">
+                            <h3 className="font-medium text-gray-700 dark:text-gray-300 text-xs sm:text-sm">Tarefa atual:</h3>
+                            <p className="text-base sm:text-lg font-semibold dark:text-white truncate">{selectedTask?.title}</p>
                         </div>
                         <button
                             onClick={() => {
                                 setSelectedTask(null);
                                 setShowTaskSelector(true);
                             }}
-                            className="p-2 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700 transition"
+                            className="p-1 sm:p-2 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700 transition"
                         >
-                            <FiX className="text-gray-500 dark:text-gray-400" />
+                            <FiX className="text-gray-500 dark:text-gray-400" size={16} />
                         </button>
                     </div>
 
-                    <div className="flex flex-col items-center space-y-4">
+                    <div className="flex flex-col items-center space-y-3 sm:space-y-4">
                         {/* Mode and timer */}
                         <div className="text-center">
-                            <span className={`px-3 py-1 rounded-full text-sm font-medium ${mode === "focus"
-                                ? "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400"
-                                : "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400"
+                            <span className={`px-2 sm:px-3 py-1 rounded-full text-xs sm:text-sm font-medium ${mode === "focus"
+                                    ? "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400"
+                                    : "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400"
                                 }`}>
                                 {getModeLabel()}
                             </span>
-                            <div className="text-5xl font-bold my-4 dark:text-white">
+                            <div className="text-4xl sm:text-5xl font-bold my-3 sm:my-4 dark:text-white">
                                 {formatTime()}
                             </div>
                         </div>
@@ -248,10 +252,10 @@ const PomodoroTimer = ({ projectId, tasks }: PomodoroTimerProps) => {
                         {mode === "focus" && (
                             <button
                                 onClick={handleTaskComplete}
-                                className="flex items-center gap-2 px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition"
+                                className="flex items-center gap-2 px-3 sm:px-4 py-1.5 sm:py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition text-sm sm:text-base"
                             >
-                                <FiCheck size={16} />
-                                Marcar tarefa como concluída
+                                <FiCheck size={14} className="flex-shrink-0" />
+                                <span className="whitespace-nowrap">Marcar como concluída</span>
                             </button>
                         )}
 
@@ -263,7 +267,7 @@ const PomodoroTimer = ({ projectId, tasks }: PomodoroTimerProps) => {
 
                         {/* Next break info */}
                         {mode === "focus" && (
-                            <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
+                            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 sm:mt-2 text-center">
                                 {settings.longBreakInterval - (completedPomodoros % settings.longBreakInterval) === 1
                                     ? "Pausa longa no próximo ciclo"
                                     : `Pausa longa em ${settings.longBreakInterval - (completedPomodoros % settings.longBreakInterval)
@@ -276,5 +280,6 @@ const PomodoroTimer = ({ projectId, tasks }: PomodoroTimerProps) => {
         </div>
     );
 };
+
 
 export default PomodoroTimer;

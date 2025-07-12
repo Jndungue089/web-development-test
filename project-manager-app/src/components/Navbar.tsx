@@ -10,7 +10,7 @@ import app from "@/firebase/config";
 const auth = getAuth(app);
 const db = getFirestore(app);
 
-export function Navbar() {
+function Navbar() {
   const [activeTab, setActiveTab] = useState("home");
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [userData, setUserData] = useState<{ name: string; email: string } | null>(null);
@@ -197,3 +197,5 @@ export function Navbar() {
     </motion.nav>
   );
 }
+
+export default Navbar; 

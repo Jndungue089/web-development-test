@@ -20,7 +20,7 @@ import ProjectTimeline from "@/components/dashboard/project/details/ProjectTimel
 
 const TaskModal = dynamic(() => import("./TaskModal"), { ssr: false });
 
-export default function ProjectDetailPage() {
+export default function ProjectDetailPage({ params }: { params: { id: string } }) {
   const { id } = useParams();
   const router = useRouter();
   const [project, setProject] = useState<Project | null>(null);

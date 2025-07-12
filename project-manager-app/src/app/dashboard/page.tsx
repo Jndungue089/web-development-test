@@ -376,50 +376,6 @@ export default function DashboardPage() {
     await Promise.all(notifications);
   };
 
-  const createDeadlineNotifications = async () => {
-    const today = new Date();
-    const projectsNearDeadline = projects.filter(p => {
-      if (p.status === "DONE" || !p.endDate) return false;
-
-      const endDate = new Date(p.endDate);
-      const timeDiff = endDate.getTime() - today.getTime();
-      const daysDiff = Math.ceil(timeDiff / (1000 * 3600 * 24));
-
-      return daysDiff <= 3; // Notificar para prazos em até 3 dias
-    });
-
-    for (const project of projectsNearDeadline) {
-      const notifications = project.members.map(async (email) => {
-        try {
-          const endDate = new Date(project.endDate);
-          const timeDiff = endDate.getTime() - today.getTime();
-          const daysDiff = Math.ceil(timeDiff / (1000 * 3600 * 24));
-
-          let message = "";
-          if (daysDiff === 0) {
-            message = `O prazo do projeto "${project.title}" vence hoje!`;
-          } else if (daysDiff < 0) {
-            message = `O prazo do projeto "${project.title}" venceu há ${Math.abs(daysDiff)} dia(s)!`;
-          } else {
-            message = `O prazo do projeto "${project.title}" vence em ${daysDiff} dia(s)`;
-          }
-
-          await addDoc(collection(db, "notifications"), {
-            projectId: project.id,
-            recipientEmail: email,
-            read: false,
-            message,
-            type: "deadline",
-            createdAt: serverTimestamp(),
-          });
-        } catch (error) {
-          console.error(`Error creating deadline notification:`, error);
-        }
-      });
-
-      await Promise.all(notifications);
-    }
-  };
 
   const createPriorityChangeNotification = async (project: Project, newPriority: string) => {
     const priorityNames = {
@@ -493,7 +449,7 @@ export default function DashboardPage() {
           </motion.h1>
           <Link
             href="/dashboard/projects/new"
-            className="flex items-center space-x-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition-colors"
+            className="flex items-center space-x-2 bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 rounded-lg transition-colors"
           >
             <FiPlus size={18} />
             <span>Novo Projeto</span>

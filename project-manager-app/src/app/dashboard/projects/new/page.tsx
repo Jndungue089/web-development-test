@@ -273,15 +273,15 @@ export default function ProjectFormPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900 p-4">
+    <div className="min-h-screen flex items-start md:items-center justify-center bg-gray-50 dark:bg-gray-900 p-2 sm:p-4">
       <form
         onSubmit={handleSubmit}
-        className="w-full max-w-2xl bg-white dark:bg-gray-800 p-6 md:p-8 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700"
+        className="w-full max-w-2xl bg-white dark:bg-gray-800 p-4 sm:p-6 md:p-8 rounded-lg md:rounded-xl shadow-md md:shadow-lg border border-gray-200 dark:border-gray-700 my-4 md:my-0"
         aria-labelledby="form-title"
       >
         <h1
           id="form-title"
-          className="text-2xl font-bold text-center text-primary dark:text-primary-300 mb-6 flex items-center justify-center gap-2"
+          className="text-xl sm:text-2xl font-bold text-center text-primary dark:text-primary-300 mb-4 md:mb-6 flex items-center justify-center gap-2"
         >
           {isEditing ? (
             <>
@@ -296,10 +296,10 @@ export default function ProjectFormPage() {
           )}
         </h1>
 
-        <div className="space-y-6">
+        <div className="space-y-4 md:space-y-6">
           {/* Título */}
           <div>
-            <label htmlFor="title" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+            <label htmlFor="title" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1 md:mb-2">
               Título do Projeto <span className="text-red-500">*</span>
             </label>
             <input
@@ -309,17 +309,17 @@ export default function ProjectFormPage() {
               value={formData.title}
               onChange={handleChange}
               className={`w-full rounded-lg border ${errors.title ? "border-red-500" : "border-gray-300 dark:border-gray-600"
-                } p-3 focus:ring-2 focus:ring-primary focus:outline-none dark:bg-gray-700 dark:text-white`}
-              placeholder="Ex: Sistema de Gestão de Tarefas"
+                } p-2 sm:p-3 focus:ring-2 focus:ring-primary focus:outline-none dark:bg-gray-700 dark:text-white`}
+              placeholder="Ex: Sistema de Gestão"
             />
-            {errors.title && <p className="mt-2 text-sm text-red-600 dark:text-red-400">{errors.title}</p>}
+            {errors.title && <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.title}</p>}
           </div>
 
           {/* Descrição */}
           <div>
             <label
               htmlFor="description"
-              className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2 flex items-center gap-2"
+              className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1 md:mb-2 flex items-center gap-2"
             >
               <FiFileText size={16} />
               Descrição
@@ -328,77 +328,80 @@ export default function ProjectFormPage() {
               id="description"
               value={formData.description}
               onChange={handleChange}
-              rows={5}
-              className="w-full rounded-lg border border-gray-300 dark:border-gray-600 p-3 focus:ring-2 focus:ring-primary focus:outline-none dark:bg-gray-700 dark:text-white"
-              placeholder="Descreva os objetivos, escopo e detalhes importantes do projeto"
+              rows={4}
+              className="w-full rounded-lg border border-gray-300 dark:border-gray-600 p-2 sm:p-3 focus:ring-2 focus:ring-primary focus:outline-none dark:bg-gray-700 dark:text-white"
+              placeholder="Descreva os objetivos do projeto"
             />
           </div>
 
-          {/* Status */}
-          <div>
-            <label htmlFor="status" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-              Status do Projeto <span className="text-red-500">*</span>
-            </label>
-            <select
-              id="status"
-              disabled={!isEditing}
-              value={formData.status}
-              onChange={handleChange}
-              className={`w-full rounded-lg border ${errors.status ? "border-red-500" : "border-gray-300 dark:border-gray-600"
-                } p-3 focus:ring-2 focus:ring-primary focus:outline-none dark:bg-gray-700 dark:text-white`}
-            >
-              <option value="TO_DO">Por Fazer</option>
-              <option value="IN_PROGRESS">Em Progresso</option>
-              <option value="DONE">Concluído</option>
-            </select>
-            {errors.status && <p className="mt-2 text-sm text-red-600 dark:text-red-400">{errors.status}</p>}
+          {/* Status e Prioridade em linha em telas maiores */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 md:gap-6">
+            {/* Status */}
+            <div>
+              <label htmlFor="status" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1 md:mb-2">
+                Status <span className="text-red-500">*</span>
+              </label>
+              <select
+                id="status"
+                disabled={!isEditing}
+                value={formData.status}
+                onChange={handleChange}
+                className={`w-full rounded-lg border ${errors.status ? "border-red-500" : "border-gray-300 dark:border-gray-600"
+                  } p-2 sm:p-3 focus:ring-2 focus:ring-primary focus:outline-none dark:bg-gray-700 dark:text-white`}
+              >
+                <option value="TO_DO">Por Fazer</option>
+                <option value="IN_PROGRESS">Em Progresso</option>
+                <option value="DONE">Concluído</option>
+              </select>
+              {errors.status && <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.status}</p>}
+            </div>
+
+            {/* Prioridade */}
+            <div>
+              <label htmlFor="priority" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1 md:mb-2">
+                Prioridade <span className="text-red-500">*</span>
+              </label>
+              <select
+                id="priority"
+                value={formData.priority || "medium"}
+                onChange={handleChange}
+                className={`w-full rounded-lg border ${errors.priority ? "border-red-500" : "border-gray-300 dark:border-gray-600"
+                  } p-2 sm:p-3 focus:ring-2 focus:ring-primary focus:outline-none dark:bg-gray-700 dark:text-white`}
+              >
+                <option value="low">Baixa</option>
+                <option value="medium">Média</option>
+                <option value="high">Alta</option>
+              </select>
+              {errors.priority && <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.priority}</p>}
+            </div>
           </div>
 
-          {/* Prioridade */}
-          <div>
-            <label htmlFor="priority" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-              Prioridade do Projeto <span className="text-red-500">*</span>
-            </label>
-            <select
-              id="priority"
-              value={formData.priority || "medium"}
-              onChange={handleChange}
-              className={`w-full rounded-lg border ${errors.priority ? "border-red-500" : "border-gray-300 dark:border-gray-600"
-                } p-3 focus:ring-2 focus:ring-primary focus:outline-none dark:bg-gray-700 dark:text-white`}
-            >
-              <option value="low">Baixa</option>
-              <option value="medium">Média</option>
-              <option value="high">Alta</option>
-            </select>
-            {errors.priority && <p className="mt-2 text-sm text-red-600 dark:text-red-400">{errors.priority}</p>}
-          </div>
-
-          {/* Datas */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {/* Datas - Sempre em coluna em mobile */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 md:gap-6">
             <div>
               <label
                 htmlFor="startDate"
-                className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2 flex items-center gap-2"
+                className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1 md:mb-2 flex items-center gap-2"
               >
                 <FiCalendar size={16} />
-                Data de Início
+                Data Início
               </label>
               <input
                 id="startDate"
                 type="date"
                 value={typeof formData.startDate === 'string' ? formData.startDate : ''}
                 onChange={handleChange}
-                className="w-full rounded-lg border border-gray-300 dark:border-gray-600 p-3 focus:ring-2 focus:ring-primary focus:outline-none dark:bg-gray-700 dark:text-white"
+                className="w-full rounded-lg border border-gray-300 dark:border-gray-600 p-2 sm:p-3 focus:ring-2 focus:ring-primary focus:outline-none dark:bg-gray-700 dark:text-white"
               />
             </div>
 
             <div>
               <label
                 htmlFor="endDate"
-                className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2 flex items-center gap-2"
+                className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1 md:mb-2 flex items-center gap-2"
               >
                 <FiCalendar size={16} />
-                Data de Término
+                Data Término
               </label>
               <input
                 id="endDate"
@@ -407,9 +410,9 @@ export default function ProjectFormPage() {
                 onChange={handleChange}
                 min={typeof formData.startDate === 'string' ? formData.startDate : ''}
                 className={`w-full rounded-lg border ${errors.endDate ? "border-red-500" : "border-gray-300 dark:border-gray-600"
-                  } p-3 focus:ring-2 focus:ring-primary focus:outline-none dark:bg-gray-700 dark:text-white`}
+                  } p-2 sm:p-3 focus:ring-2 focus:ring-primary focus:outline-none dark:bg-gray-700 dark:text-white`}
               />
-              {errors.endDate && <p className="mt-2 text-sm text-red-600 dark:text-red-400">{errors.endDate}</p>}
+              {errors.endDate && <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.endDate}</p>}
             </div>
           </div>
 
@@ -417,26 +420,26 @@ export default function ProjectFormPage() {
           <div>
             <label
               htmlFor="members"
-              className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2 flex items-center gap-2"
+              className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1 md:mb-2 flex items-center gap-2"
             >
               <FiUser size={16} />
-              Membros da Equipe
+              Membros
             </label>
             
-            <div className="flex gap-2">
+            <div className="flex flex-col sm:flex-row gap-2">
               <input
                 id="members"
                 type="email"
                 value={emailInput}
                 onChange={(e) => setEmailInput(e.target.value)}
-                placeholder="Digite o email do membro"
-                className="flex-1 rounded-lg border border-gray-300 dark:border-gray-600 p-3 focus:ring-2 focus:ring-primary focus:outline-none dark:bg-gray-700 dark:text-white"
+                placeholder="Email do membro"
+                className="flex-1 rounded-lg border border-gray-300 dark:border-gray-600 p-2 sm:p-3 focus:ring-2 focus:ring-primary focus:outline-none dark:bg-gray-700 dark:text-white"
               />
               <button
                 type="button"
                 onClick={handleAddMember}
                 disabled={isSearching}
-                className="px-4 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
+                className="px-4 py-2 sm:py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
               >
                 {isSearching ? "Verificando..." : "Adicionar"}
               </button>
@@ -444,21 +447,22 @@ export default function ProjectFormPage() {
 
             {/* Membros adicionados */}
             {formData.members.length > 0 && (
-              <div className="mt-3">
-                <p className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Membros adicionados:</p>
-                <div className="flex flex-wrap gap-2">
+              <div className="mt-2 md:mt-3">
+                <p className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1 md:mb-2">Membros:</p>
+                <div className="flex flex-wrap gap-1 md:gap-2">
                   {formData.members.map((member, index) => (
                     <div
                       key={index}
-                      className="px-3 py-1 bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-200 rounded-full text-sm flex items-center"
+                      className="px-2 py-1 text-xs sm:text-sm bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-200 rounded-full flex items-center"
                     >
-                      {member}
+                      {member.length > 20 ? `${member.substring(0, 15)}...` : member}
                       <button
                         type="button"
                         onClick={() => removeMember(member)}
-                        className="ml-2 text-blue-500 hover:text-blue-700 dark:hover:text-blue-300"
+                        className="ml-1 text-blue-500 hover:text-blue-700 dark:hover:text-blue-300"
+                        aria-label={`Remover ${member}`}
                       >
-                        <X size={14} />
+                        <X size={12} />
                       </button>
                     </div>
                   ))}
@@ -467,19 +471,19 @@ export default function ProjectFormPage() {
             )}
           </div>
 
-          {/* Botões de ação */}
-          <div className="flex justify-end gap-4 pt-4">
+          {/* Botões de ação - Coluna em mobile */}
+          <div className="flex flex-col sm:flex-row justify-end gap-2 sm:gap-4 pt-2 md:pt-4">
             <button
               type="button"
               onClick={() => router.push("/dashboard")}
-              className="px-6 py-3 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition font-medium"
+              className="px-4 py-2 sm:px-6 sm:py-3 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition font-medium order-2 sm:order-1"
             >
               Cancelar
             </button>
             <button
               type="submit"
               disabled={loading}
-              className="flex items-center gap-2 px-6 py-3 bg-primary hover:bg-primary-dark text-white rounded-lg transition font-medium disabled:opacity-70"
+              className="flex items-center justify-center gap-1 sm:gap-2 px-4 py-2 sm:px-6 sm:py-3 bg-primary hover:bg-primary-dark text-white rounded-lg transition font-medium disabled:opacity-70 order-1 sm:order-2 mb-2 sm:mb-0"
             >
               {loading ? (
                 <>
@@ -488,8 +492,8 @@ export default function ProjectFormPage() {
                 </>
               ) : (
                 <>
-                  {isEditing ? <FiSave size={18} /> : <FiPlus size={18} />}
-                  {isEditing ? "Salvar Projeto" : "Criar Projeto"}
+                  {isEditing ? <FiSave size={16} /> : <FiPlus size={16} />}
+                  <span>{isEditing ? "Salvar" : "Criar"}</span>
                 </>
               )}
             </button>

@@ -96,7 +96,6 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           email: currentUser.email,
         });
         setLoading(false);
-        toast.success(`Bem-vindo(a), ${currentUser.displayName || currentUser.email?.split("@")[0] || "Usuário"}!`);
       }
     });
 

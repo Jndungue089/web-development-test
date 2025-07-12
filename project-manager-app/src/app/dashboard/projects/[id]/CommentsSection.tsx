@@ -35,26 +35,31 @@ export default function CommentsSection({ projectId, taskId, isNewTask }: Commen
     improvements: ""
   });
 
-  useEffect(() => {
+  // Função para carregar comentários
+  const loadComments = () => {
     if (!taskId || isNewTask) return;
 
-    const unsubscribe = onSnapshot(
-      collection(db, "projects", projectId, "tasks", taskId, "comments"),
-      (snapshot) => {
-        const commentsData = snapshot.docs.map(doc => ({
-          id: doc.id,
-          ...doc.data()
-        })) as Comment[];
-        setComments(commentsData.sort((a, b) => b.createdAt?.seconds - a.createdAt?.seconds));
-      }
-    );
+    const commentsRef = collection(db, "projects", projectId, "tasks", taskId, "comments");
+    const unsubscribe = onSnapshot(commentsRef, (snapshot) => {
+      const commentsData = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      })) as Comment[];
+      setComments(commentsData.sort((a, b) => b.createdAt?.seconds - a.createdAt?.seconds));
+    });
 
-    return () => unsubscribe();
+    return unsubscribe;
+  };
+
+  useEffect(() => {
+    const unsubscribe = loadComments();
+    return () => {
+      if (unsubscribe) unsubscribe();
+    };
   }, [projectId, taskId, isNewTask]);
 
   const createNotification = async (message: string) => {
     try {
-      // Primeiro obtemos os membros do projeto
       const projectDoc = await getDoc(doc(db, "projects", projectId));
       if (!projectDoc.exists()) return;
 
@@ -62,9 +67,8 @@ export default function CommentsSection({ projectId, taskId, isNewTask }: Commen
       const members = projectData.members || [];
       const owner = projectData.owner;
 
-      // Criar notificações para todos os membros e o dono
       const notifications = [...members, owner]
-        .filter(email => email !== user?.email) // Não notificar o próprio usuário
+        .filter(email => email !== user?.email)
         .map(async (email) => {
           await addDoc(collection(db, "notifications"), {
             projectId,
@@ -89,21 +93,13 @@ export default function CommentsSection({ projectId, taskId, isNewTask }: Commen
 
     setLoading(true);
     try {
-      // Primeiro obtemos os detalhes da tarefa para a mensagem da notificação
-      const taskDoc = await getDoc(doc(db, "projects", projectId, "tasks", taskId));
-      const taskTitle = taskDoc.exists() ? taskDoc.data().title : "a tarefa";
-
-      // Adiciona o comentário
+      // Envia apenas para o Firebase e aguarda resposta
       await addDoc(collection(db, "projects", projectId, "tasks", taskId, "comments"), {
         text: newComment,
         author: user.displayName || user.email || "Usuário anônimo",
-        authorEmail: user.email,
+        authorEmail: user.email || "",
         createdAt: Timestamp.now(),
       });
-
-      // Cria notificação
-      const notificationMessage = `${user.displayName || user.email} comentou na tarefa "${taskTitle}"`;
-      await createNotification(notificationMessage);
 
       setNewComment("");
       toast.success("Comentário adicionado!");
@@ -120,12 +116,7 @@ export default function CommentsSection({ projectId, taskId, isNewTask }: Commen
 
     setLoading(true);
     try {
-      // Primeiro obtemos os detalhes da tarefa para a mensagem da notificação
-      const taskDoc = await getDoc(doc(db, "projects", projectId, "tasks", taskId));
-      const taskTitle = taskDoc.exists() ? taskDoc.data().title : "a tarefa";
-
-      // Adiciona o feedback como um comentário especial
-      await addDoc(collection(db, "projects", projectId, "tasks", taskId, "comments"), {
+      const feedbackData = {
         text: "Feedback enviado sobre a tarefa",
         author: user.displayName || user.email || "Usuário anônimo",
         authorEmail: user.email,
@@ -134,10 +125,36 @@ export default function CommentsSection({ projectId, taskId, isNewTask }: Commen
           difficulty: feedback.difficulty,
           improvements: feedback.improvements
         }
+      };
+
+      await addDoc(collection(db, "projects", projectId, "tasks", taskId, "comments"), {
+        text: "Feedback enviado sobre a tarefa",
+        author: user.displayName || user.email || "Usuário anônimo",
+        authorEmail: user.email || "",
+        createdAt: Timestamp.now(),
+        feedback: {
+          difficulty: feedback.difficulty,
+          improvements: feedback.improvements
+        }
       });
 
-      // Cria notificação
+      // Atualiza a lista de comentários localmente
+      setComments(prev => [{
+        id: `temp-${Date.now()}`,
+        text: "Feedback enviado sobre a tarefa",
+        author: user?.displayName || user?.email || "Usuário anônimo",
+        authorEmail: user?.email || "",
+        createdAt: Timestamp.now(),
+        feedback: {
+          difficulty: feedback.difficulty,
+          improvements: feedback.improvements
+        }
+      } as Comment, ...prev]);
+
+      const taskDoc = await getDoc(doc(db, "projects", projectId, "tasks", taskId));
+      const taskTitle = taskDoc.exists() ? taskDoc.data().title : "a tarefa";
       const notificationMessage = `${user.displayName || user.email} enviou feedback sobre a tarefa "${taskTitle}"`;
+
       await createNotification(notificationMessage);
 
       setFeedback({ difficulty: "medium", improvements: "" });
@@ -169,8 +186,8 @@ export default function CommentsSection({ projectId, taskId, isNewTask }: Commen
         ) : (
           comments.map(comment => (
             <div key={comment.id} className="border-b border-gray-200 dark:border-gray-700 pb-4">
-              <div className="flex items-start">
-                <div className="w-8 h-8 rounded-full bg-gray-200 dark:bg-gray-700 flex items-center justify-center mr-3">
+              <div className="flex items-start gap-3">
+                <div className="w-8 h-8 rounded-full bg-gray-200 dark:bg-gray-700 flex items-center justify-center flex-shrink-0">
                   <FiUser className="text-gray-600 dark:text-gray-400" />
                 </div>
                 <div className="flex-1">
@@ -181,7 +198,7 @@ export default function CommentsSection({ projectId, taskId, isNewTask }: Commen
                       {comment.createdAt?.toDate().toLocaleString()}
                     </span>
                   </div>
-                  <p className="mt-1 text-sm">{comment.text}</p>
+                  <p className="mt-1 text-sm whitespace-pre-wrap">{comment.text}</p>
 
                   {comment.feedback && (
                     <div className="mt-2 p-3 bg-gray-100 dark:bg-gray-700 rounded-lg">
@@ -201,7 +218,7 @@ export default function CommentsSection({ projectId, taskId, isNewTask }: Commen
                       {comment.feedback.improvements && (
                         <div className="mt-2 text-sm">
                           <div className="font-medium">Pontos a melhorar:</div>
-                          <p>{comment.feedback.improvements}</p>
+                          <p className="whitespace-pre-wrap">{comment.feedback.improvements}</p>
                         </div>
                       )}
                     </div>
@@ -213,17 +230,12 @@ export default function CommentsSection({ projectId, taskId, isNewTask }: Commen
         )}
       </div>
 
-      <form onSubmit={async (e) => {
-        e.preventDefault(); // Isso previne o reload da página
-        await handleSubmitComment(e);
-      }}
-        className="space-y-3">
+      <form onSubmit={handleSubmitComment} className="space-y-3">
         <div className="relative">
           <textarea
             value={newComment}
             onChange={(e) => {
               setNewComment(e.target.value);
-              // Validação em tempo real
               if (e.target.value.length > 500) {
                 toast.warning("Comentário muito longo (máx. 500 caracteres)");
               }
@@ -232,13 +244,14 @@ export default function CommentsSection({ projectId, taskId, isNewTask }: Commen
             className="w-full px-4 py-3 rounded-lg border border-gray-300 dark:border-gray-600 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white pr-12"
             rows={3}
             maxLength={500}
+            disabled={loading}
           />
           <span className="absolute bottom-3 right-3 text-xs text-gray-400 dark:text-gray-500">
             {newComment.length}/500
           </span>
         </div>
 
-        <div className="flex justify-between items-center">
+        <div className="flex flex-wrap justify-between items-center gap-2">
           <div className="flex gap-2">
             <button
               type="button"
@@ -247,21 +260,16 @@ export default function CommentsSection({ projectId, taskId, isNewTask }: Commen
                 ? "bg-gray-200 dark:bg-gray-600 text-gray-800 dark:text-gray-200"
                 : "text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20"
                 }`}
+              disabled={loading}
             >
-              {showFeedbackForm ? (
-                "Cancelar feedback"
-              ) : (
-                <>
-                  <span className="hidden sm:inline">Adicionar </span>Feedback
-                </>
-              )}
+              {showFeedbackForm ? "Cancelar" : "Feedback"}
             </button>
 
-            {/* Opcional: Botão para adicionar menções */}
             <button
               type="button"
               onClick={() => toast.info("Funcionalidade de menções em desenvolvimento")}
               className="text-sm px-3 py-1 rounded-lg text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-600 transition"
+              disabled={loading}
             >
               @Mencionar
             </button>
@@ -270,7 +278,7 @@ export default function CommentsSection({ projectId, taskId, isNewTask }: Commen
           <button
             type="submit"
             disabled={loading || !newComment.trim()}
-            className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition disabled:opacity-70 disabled:cursor-not-allowed"
+            className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition disabled:opacity-70 disabled:cursor-not-allowed min-w-[120px] justify-center"
           >
             {loading ? (
               <>
@@ -280,13 +288,12 @@ export default function CommentsSection({ projectId, taskId, isNewTask }: Commen
             ) : (
               <>
                 <FiSend className="flex-shrink-0" />
-                <span className="hidden sm:inline">Enviar</span>
+                Enviar
               </>
             )}
           </button>
         </div>
 
-        {/* Dica de formatação */}
         <div className="text-xs text-gray-500 dark:text-gray-400">
           Dica: Use Markdown para <strong>**negrito**</strong> ou <em>*itálico*</em>
         </div>
@@ -302,6 +309,7 @@ export default function CommentsSection({ projectId, taskId, isNewTask }: Commen
                 value={feedback.difficulty}
                 onChange={(e) => setFeedback({ ...feedback, difficulty: e.target.value as any })}
                 className="w-full px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-700 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-800 dark:text-white"
+                disabled={loading}
               >
                 <option value="easy">Fácil</option>
                 <option value="medium">Médio</option>
@@ -316,17 +324,28 @@ export default function CommentsSection({ projectId, taskId, isNewTask }: Commen
                 placeholder="O que poderia ser melhorado nesta tarefa?"
                 className="w-full px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-700 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-800 dark:text-white"
                 rows={2}
+                disabled={loading}
               />
             </div>
-            <button
-              type="button"
-              onClick={handleSubmitFeedback}
-              disabled={loading}
-              className="flex items-center px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition disabled:opacity-70"
-            >
-              <FiSend className="mr-2" />
-              Enviar Feedback
-            </button>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={handleSubmitFeedback}
+                disabled={loading}
+                className="flex-1 flex items-center justify-center px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition disabled:opacity-70"
+              >
+                <FiSend className="mr-2" />
+                Enviar Feedback
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowFeedbackForm(false)}
+                disabled={loading}
+                className="flex-1 px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition"
+              >
+                Cancelar
+              </button>
+            </div>
           </div>
         </div>
       )}

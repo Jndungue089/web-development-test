@@ -36,17 +36,23 @@ export default function TaskModal({ projectId, task, allUsers, projectMembers, o
   const [status, setStatus] = useState(task?.status || "pending");
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState("details");
-  const [selectedTask, setSelectedTask] = useState<Task | null>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // Validação básica
+    if (!title.trim()) {
+      toast.error("O título da tarefa é obrigatório");
+      return;
+    }
+
     setLoading(true);
 
     try {
       const taskData = {
-        title,
-        description,
-        notes,
+        title: title.trim(),
+        description: description.trim(),
+        notes: notes.trim(),
         dueDate,
         assignedTo,
         status,
@@ -59,17 +65,19 @@ export default function TaskModal({ projectId, task, allUsers, projectMembers, o
         toast.success("Tarefa atualizada com sucesso!");
       } else {
         // Criar nova tarefa
-        await setDoc(doc(collection(db, "projects", projectId, "tasks")), {
+        const newTaskRef = doc(collection(db, "projects", projectId, "tasks"));
+        await setDoc(newTaskRef, {
           ...taskData,
           createdAt: Timestamp.now(),
+          id: newTaskRef.id, // Adiciona o ID ao documento
         });
         toast.success("Tarefa criada com sucesso!");
       }
 
       onClose();
     } catch (error) {
-      toast.error("Erro ao salvar tarefa");
       console.error("Error saving task:", error);
+      toast.error("Erro ao salvar tarefa");
     } finally {
       setLoading(false);
     }
@@ -77,22 +85,28 @@ export default function TaskModal({ projectId, task, allUsers, projectMembers, o
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white dark:bg-gray-800 rounded-xl shadow-xl max-w-2xl w-full max-h-[90vh] overflow-hidden">
+      <form onSubmit={handleSubmit} className="bg-white dark:bg-gray-800 rounded-xl shadow-xl max-w-2xl w-full max-h-[90vh] overflow-hidden">
         <div className="flex justify-between items-center border-b border-gray-200 dark:border-gray-700 p-4">
           <h2 className="text-xl font-bold">{task ? "Editar Tarefa" : "Nova Tarefa"}</h2>
-          <button onClick={onClose} className="text-gray-500 hover:text-gray-700 dark:hover:text-gray-300">
+          <button 
+            type="button" 
+            onClick={onClose} 
+            className="text-gray-500 hover:text-gray-700 dark:hover:text-gray-300"
+          >
             <FiX size={24} />
           </button>
         </div>
 
         <div className="flex border-b border-gray-200 dark:border-gray-700">
           <button
+            type="button"
             onClick={() => setActiveTab("details")}
             className={`px-4 py-3 font-medium ${activeTab === "details" ? "text-blue-600 border-b-2 border-blue-600" : "text-gray-600 dark:text-gray-400"}`}
           >
             Detalhes
           </button>
           <button
+            type="button"
             onClick={() => setActiveTab("comments")}
             className={`px-4 py-3 font-medium ${activeTab === "comments" ? "text-blue-600 border-b-2 border-blue-600" : "text-gray-600 dark:text-gray-400"}`}
           >
@@ -100,7 +114,7 @@ export default function TaskModal({ projectId, task, allUsers, projectMembers, o
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="overflow-y-auto max-h-[calc(90vh-150px)] p-6">
+        <div className="overflow-y-auto max-h-[calc(90vh-150px)] p-6">
           {activeTab === "details" ? (
             <div className="space-y-6">
               <div>
@@ -154,7 +168,8 @@ export default function TaskModal({ projectId, task, allUsers, projectMembers, o
                   </label>
                   <select
                     value={status}
-                    onChange={(e) => setStatus(e.target.value)}
+                    disabled={!task}
+                    onChange={(e) => setStatus(e.target.value as any)}
                     className="w-full px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-700 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
                   >
                     <option value="pending">Pendente</option>
@@ -208,8 +223,8 @@ export default function TaskModal({ projectId, task, allUsers, projectMembers, o
               )}
             </button>
           </div>
-        </form>
-      </div>
+        </div>
+      </form>
     </div>
   );
 }

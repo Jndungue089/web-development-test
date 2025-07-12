@@ -10,6 +10,12 @@ interface TaskCardProps {
   onStatusChange: (taskId: string, newStatus: Task["status"]) => void;
 }
 
+// Função para truncar texto com limite de caracteres
+const truncateText = (text: string, maxLength: number) => {
+  if (!text) return "";
+  return text.length > maxLength ? `${text.substring(0, maxLength)}...` : text;
+};
+
 export default function TaskCard({ task, onClick, onStatusChange }: TaskCardProps) {
   const [{ isDragging }, drag] = useDrag(() => ({
     type: "TASK",
@@ -34,31 +40,42 @@ export default function TaskCard({ task, onClick, onStatusChange }: TaskCardProp
       whileTap={{ scale: 0.98 }}
       transition={{ type: "spring", stiffness: 400, damping: 17 }}
       onClick={onClick}
-      className={`p-4 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 cursor-pointer transition ${
+      className={`p-3 sm:p-4 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 cursor-pointer transition ${
         isDragging ? "opacity-50 shadow-lg" : ""
       } ${isOverdue ? "border-l-4 border-l-red-500" : ""}`}
     >
-      <div className="flex justify-between items-start">
-        <h4 className="font-medium">{task.title}</h4>
+      <div className="flex justify-between items-start gap-2">
+        <h4 className="font-medium text-sm sm:text-base break-words line-clamp-2">
+          {truncateText(task.title, 50)}
+        </h4>
         {isOverdue && (
-          <span className="flex items-center text-xs text-red-500">
+          <span className="flex items-center text-xs text-red-500 whitespace-nowrap flex-shrink-0">
             <FiAlertTriangle className="mr-1" /> Atrasada
           </span>
         )}
       </div>
+      
       {task.description && (
-        <p className="text-sm text-gray-600 dark:text-gray-400 mt-1 line-clamp-2">{task.description}</p>
+        <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 mt-1 line-clamp-2 break-words">
+          {truncateText(task.description, 100)}
+        </p>
       )}
+      
       {task.dueDate && (
         <div className="flex items-center text-xs text-gray-500 dark:text-gray-400 mt-2">
-          <FiCalendar className="mr-1" size={12} />
-          <span>Prazo: {new Date(task.dueDate).toLocaleDateString()}</span>
+          <FiCalendar className="mr-1 flex-shrink-0" size={12} />
+          <span className="truncate">
+            Prazo: {new Date(task.dueDate).toLocaleDateString()}
+          </span>
         </div>
       )}
+      
       {task.assignedTo && task.assignedTo.length > 0 && (
         <div className="flex items-center text-xs text-gray-500 dark:text-gray-400 mt-1">
-          <FiUser className="mr-1" size={12} />
-          <span>{task.assignedTo.length} responsável(is)</span>
+          <FiUser className="mr-1 flex-shrink-0" size={12} />
+          <span className="truncate">
+            {task.assignedTo.length} {task.assignedTo.length === 1 ? 'responsável' : 'responsáveis'}
+          </span>
         </div>
       )}
     </motion.div>

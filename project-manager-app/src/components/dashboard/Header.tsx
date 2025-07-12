@@ -179,7 +179,7 @@ export default function Header({ onUserMenu }: { onUserMenu?: () => void }) {
       .slice(0, 5);
 
   return (
-    <header className="w-full px-6 py-4 bg-gradient-to-r from-blue-600 to-indigo-700 text-white shadow-lg mb-6 relative">
+    <header className="w-full px-4 sm:px-6 py-4 bg-gradient-to-r from-blue-600 to-indigo-700 text-white shadow-lg mb-6 relative">
       <div className="absolute inset-0 bg-[url('data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' viewBox=\'0 0 1440 320\'%3E%3Cpath fill=\'%23000022\' fill-opacity=\'0.1\' d=\'M0,64L48,80C96,96,192,128,288,128C384,128,480,96,576,85.3C672,75,768,85,864,106.7C960,128,1056,160,1152,176C1248,192,1344,192,1392,192L1440,192V320H1392C1344,320,1248,320,1152,320C1056,320,960,320,864,320C768,320,672,320,576,320C480,320,384,320,288,320C192,320,96,320,48,320H0V64Z\'/%3E%3C/svg%3E')] opacity-50 pointer-events-none" />
 
       <div className="relative z-10 flex items-center justify-between">
@@ -213,109 +213,131 @@ export default function Header({ onUserMenu }: { onUserMenu?: () => void }) {
           </motion.button>
           {/* Dropdown de Notificações */}
           <div className="relative" ref={notificationsRef}>
-            <motion.div
-              whileHover={{ scale: 1.1, rotate: 5 }}
+            <motion.button
+              whileHover={{ scale: 1.1 }}
               whileTap={{ scale: 0.95 }}
-              className="relative cursor-pointer transition-transform duration-200"
-              onClick={() => setShowAllNotifications(!showAllNotifications)}
+              className="relative p-2 rounded-full hover:bg-blue-700 transition"
+              onClick={(e) => {
+                e.stopPropagation();
+                setShowAllNotifications(!showAllNotifications);
+              }}
+              aria-label="Notificações"
             >
-              <Bell className="w-6 h-6" />
+              <Bell className="w-5 h-5 sm:w-6 sm:h-6" />
               {unreadCount > 0 && (
                 <motion.span
                   initial={{ scale: 0 }}
                   animate={{ scale: 1 }}
-                  className="absolute -top-1 -right-2 bg-red-400 text-white text-xs rounded-full px-1.5 py-0.5 shadow-md"
+                  className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center"
                 >
                   {unreadCount}
                 </motion.span>
               )}
-            </motion.div>
+            </motion.button>
 
             <AnimatePresence>
               {showAllNotifications && (
-                <motion.div
-                  initial={{ opacity: 0, y: -10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -10 }}
-                  transition={{ duration: 0.2 }}
-                  className="absolute right-0 mt-2 w-80 bg-white dark:bg-gray-800 rounded-lg shadow-xl z-50 overflow-hidden border border-gray-200 dark:border-gray-700"
-                >
-                  <div className="p-3 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center">
-                    <h3 className="font-semibold text-gray-800 dark:text-white">Notificações</h3>
-                    <div className="flex gap-2">
-                      <button
-                        onClick={markAllAsRead}
-                        className="text-xs text-blue-600 dark:text-blue-400 hover:underline"
-                        disabled={unreadCount === 0}
-                      >
-                        Marcar todas como lidas
-                      </button>
-                      <button
-                        onClick={() => setShowAllNotifications(false)}
-                        className="text-gray-500 hover:text-gray-700 dark:hover:text-gray-300"
-                      >
-                        <X size={16} />
-                      </button>
-                    </div>
-                  </div>
-
-                  <div className="max-h-96 overflow-y-auto">
-                    {displayedNotifications.length > 0 ? (
-                      displayedNotifications.map((notification) => (
-                        <div
-                          key={notification.id}
-                          className={`p-3 border-b border-gray-100 dark:border-gray-700 ${notification.read ? 'bg-gray-50 dark:bg-gray-700/50' : 'bg-white dark:bg-gray-800'}`}
+                <>
+                  {/* Overlay para mobile */}
+                  <motion.div
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    className="fixed inset-0 bg-black bg-opacity-50 z-40 sm:hidden"
+                    onClick={() => setShowAllNotifications(false)}
+                  />
+                  {/* Conteúdo do dropdown */}
+                  <motion.div
+                    initial={{ opacity: 0, y: -20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -20 }}
+                    transition={{ duration: 0.2 }}
+                    className={`
+                  fixed sm:absolute 
+                  left-1/2 sm:left-auto sm:right-0 
+                  transform -translate-x-1/2 sm:translate-x-0
+                  top-16 sm:top-10
+                  w-[95vw] sm:w-80 
+                  max-w-md mx-auto sm:mx-0
+                  bg-white dark:bg-gray-800 rounded-lg shadow-xl z-50 
+                  overflow-hidden border border-gray-200 dark:border-gray-700
+                  max-h-[70vh] overflow-y-auto
+                `}
+                  >
+                    <div className="p-3 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center">
+                      <h3 className="font-semibold text-gray-800 dark:text-white">Notificações</h3>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={markAllAsRead}
+                          className="text-xs text-blue-600 dark:text-blue-400 hover:underline"
+                          disabled={unreadCount === 0}
                         >
-                          <div className="flex justify-between items-start">
-                            <div className="flex-1">
-                              <h4 className="font-medium text-gray-800 dark:text-white">{notification.title}</h4>
-                              <p className="text-sm text-gray-600 dark:text-gray-300 mt-1">{notification.message}</p>
-                              <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
-                                {notification.createdAt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                              </p>
-                            </div>
-                            <div className="flex gap-2 ml-2">
-                              <button
-                                onClick={() => toggleReadStatus(notification.id, notification.read)}
-                                className="p-1 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700"
-                                title={notification.read ? "Marcar como não lida" : "Marcar como lida"}
-                              >
-                                {notification.read ? (
-                                  <MailOpen size={16} className="text-gray-500" />
-                                ) : (
-                                  <Mail size={16} className="text-blue-500" />
-                                )}
-                              </button>
-                              <button
-                                onClick={() => deleteNotification(notification.id)}
-                                className="p-1 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700"
-                                title="Excluir notificação"
-                              >
-                                <X size={16} className="text-gray-500" />
-                              </button>
+                          Marcar todas como lidas
+                        </button>
+                        <button
+                          onClick={() => setShowAllNotifications(false)}
+                          className="text-gray-500 hover:text-gray-700 dark:hover:text-gray-300"
+                        >
+                          <X size={16} />
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="max-h-96 overflow-y-auto">
+                      {displayedNotifications.length > 0 ? (
+                        displayedNotifications.map((notification) => (
+                          <div
+                            key={notification.id}
+                            className={`p-3 border-b border-gray-100 dark:border-gray-700 ${notification.read ? 'bg-gray-50 dark:bg-gray-700/50' : 'bg-white dark:bg-gray-800'}`}
+                          >
+                            <div className="flex justify-between items-start">
+                              <div className="flex-1">
+                                <h4 className="font-medium text-gray-800 dark:text-white">{notification.title}</h4>
+                                <p className="text-sm text-gray-600 dark:text-gray-300 mt-1">{notification.message}</p>
+                                <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
+                                  {notification.createdAt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                </p>
+                              </div>
+                              <div className="flex gap-2 ml-2">
+                                <button
+                                  onClick={() => toggleReadStatus(notification.id, notification.read)}
+                                  className="p-1 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700"
+                                  title={notification.read ? "Marcar como não lida" : "Marcar como lida"}
+                                >
+                                  {notification.read ? (
+                                    <MailOpen size={16} className="text-gray-500" />
+                                  ) : (
+                                    <Mail size={16} className="text-blue-500" />
+                                  )}
+                                </button>
+                                <button
+                                  onClick={() => deleteNotification(notification.id)}
+                                  className="p-1 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700"
+                                  title="Excluir notificação"
+                                >
+                                  <X size={16} className="text-gray-500" />
+                                </button>
+                              </div>
                             </div>
                           </div>
+                        ))
+                      ) : (
+                        <div className="p-4 text-center text-gray-500 dark:text-gray-400">
+                          Nenhuma notificação
                         </div>
-                      ))
-                    ) : (
-                      <div className="p-4 text-center text-gray-500 dark:text-gray-400">
-                        Nenhuma notificação
-                      </div>
-                    )}
-                  </div>
-
-                  {notifications.length > 5 && (
-                    <div className="p-3 border-t border-gray-200 dark:border-gray-700 text-center">
-                      <button
-                        onClick={() => router.push("/notifications")}
-                        className="text-sm text-blue-600 dark:text-blue-400 hover:underline flex items-center justify-center gap-1 w-full"
-                      >
-                        Ver todas as notificações
-                        <ChevronDown size={16} />
-                      </button>
+                      )}
                     </div>
-                  )}
-                </motion.div>
+
+                      <div className="p-3 border-t border-gray-200 dark:border-gray-700 text-center">
+                        <button
+                          onClick={() => router.push("/dashboard/notifications")}
+                          className="text-sm text-blue-600 dark:text-blue-400 hover:underline flex items-center justify-center gap-1 w-full"
+                        >
+                          Ver todas as notificações
+                        </button>
+                      </div>
+                  </motion.div>
+                </>
               )}
             </AnimatePresence>
           </div>
@@ -327,7 +349,7 @@ export default function Header({ onUserMenu }: { onUserMenu?: () => void }) {
               onClick={() => setDropdown((d) => !d)}
             >
               <User className="w-7 h-7 text-white" />
-              <span className="font-medium text-white hidden sm:block">{userData?.name || "Usuário"}</span>
+              <span className="font-medium text-white hidden sm:block">{userData?.name || `${user?.email?.split("@")[0]}`}</span>
             </motion.button>
             <AnimatePresence>
               {dropdown && (
@@ -346,7 +368,7 @@ export default function Header({ onUserMenu }: { onUserMenu?: () => void }) {
                   >
                     <User className="w-8 h-8 text-gray-500" />
                   </motion.div>
-                  <div className="font-semibold text-lg mb-1">{userData?.name || "Usuário"}</div>
+                  <div className="font-semibold text-lg mb-1">{userData?.name || `@${user?.email?.split("@")[0]}`}</div>
                   <div className="text-gray-500 text-sm mb-3">{user?.email || "Nenhum email"}</div>
                   <button
                     className="w-full text-left px-3 py-2 hover:bg-gray-100 rounded flex items-center gap-2 transition-colors duration-200"
