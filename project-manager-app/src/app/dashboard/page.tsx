@@ -18,7 +18,7 @@ ChartJS.register(ArcElement, BarElement, CategoryScale, LinearScale, Tooltip, Le
 import Link from "next/link";
 import { exportProjectsToCSV, exportProjectsToPDF } from "@/utils/exportUtils";
 import { toDateSafe } from "@/utils/dateUtils";
-import { useAuth } from "@/context/AuthContext";
+// import { useAuth } from "@/context/AuthContext";
 
 // Tipos para o projeto
 type Project = {
@@ -131,8 +131,7 @@ const ProjectColumn = ({
   );
 };
 
-export default function DashboardPage() {
-  const { user, loading: loadingAuth } = useAuth();
+function DashboardPage() {
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
   const [archivedProjects, setArchivedProjects] = useState<Project[]>([]);
@@ -142,16 +141,9 @@ export default function DashboardPage() {
   const [showReport, setShowReport] = useState(false);
 
   useEffect(() => {
-    if (loadingAuth) return;
     const unsubscribe = onSnapshot(collection(db, "projects"), (snapshot) => {
       const allProjects = snapshot.docs.map((doc) => {
         const data = doc.data();
-        let userId = user?.uid;
-        let userEmail = user?.email;
-        const isOwner = userId ? data.owner === userId : false;
-        const isMember = userEmail ? (data.members || []).includes(userEmail) : false;
-        const role: "Owner" | "Participant" | undefined = isOwner ? "Owner" : isMember ? "Participant" : undefined;
-        const isAdmin = isOwner;
         const createdAt = toDateSafe(data.createdAt);
         return {
           id: doc.id,
@@ -161,8 +153,6 @@ export default function DashboardPage() {
           priority: data.priority || "medium",
           createdAt: createdAt === null ? undefined : createdAt,
           archived: !!data.archived,
-          role,
-          isAdmin,
         };
       });
       setProjects(allProjects.filter(p => !p.archived));
@@ -170,7 +160,7 @@ export default function DashboardPage() {
       setLoading(false);
     });
     return () => unsubscribe();
-  }, [user, loadingAuth]);
+  }, []);
 
   const moveProject = async (id: string, newStatus: Project["status"], archive = false, remove = false) => {
     if (archive) {
@@ -214,7 +204,7 @@ export default function DashboardPage() {
     setConfirmDelete(null);
   };
 
-  if (loading || loadingAuth) {
+  if (loading) {
     return (
       <div className="flex items-center justify-center h-screen">
         <div className="animate-pulse text-gray-500">Carregando projetos...</div>
@@ -307,7 +297,6 @@ export default function DashboardPage() {
           <DeleteDropZone
             projects={projects}
             setConfirmDelete={setConfirmDelete}
-            canDelete={user && (user.uid || "") ? true : false}
           />
         </div>
         {/* Seção do Kanban */}
@@ -324,7 +313,6 @@ export default function DashboardPage() {
             onDrop={async (id: string) => {
               setConfirmArchive({ id, open: true });
             }}
-            canArchive={user && (user.uid || "") ? true : false}
           />
         )}
         {/* Botão para ver projetos arquivados */}
@@ -386,6 +374,7 @@ export default function DashboardPage() {
   );
 }
 
+export default DashboardPage;
 // Card de Estatística para indicadores
 const StatCard = ({ icon, title, value, trend, color }: { icon: React.ReactNode; title: string; value: string | number; trend?: string; color: string }) => (
   <motion.div
