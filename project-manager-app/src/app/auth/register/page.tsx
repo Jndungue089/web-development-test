@@ -7,7 +7,7 @@ import { useRouter } from "next/navigation";
 import { FiMail, FiLock, FiUser, FiArrowRight, FiAlertCircle, FiLoader, FiGrid } from "react-icons/fi";
 import { FcGoogle } from "react-icons/fc";
 import Link from "next/link";
-import { Navbar } from "@/components/Navbar";
+import Navbar  from "@/components/Navbar";
 
 export default function RegisterPage() {
   const [name, setName] = useState("");
