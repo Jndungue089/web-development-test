@@ -114,7 +114,7 @@ const ProjectCard = ({ project, moveProject, updatePriority }: { project: Projec
           </h3>
           <div className="flex items-center gap-2">
             <span className="text-xs px-2 py-1 rounded-full bg-blue-100 text-blue-800">
-              {project.role === "Owner" ? "Dono" : "Participante"}
+              {project.role === "Owner" ? "Criador(a)" : "Participante"}
             </span>
             {project.priority && (
               <span className={`text-xs px-2 py-1 rounded-full ${priorityColors[project.priority]}`}>

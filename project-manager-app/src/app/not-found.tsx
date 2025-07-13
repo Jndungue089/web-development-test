@@ -81,7 +81,7 @@ export default function NotFound() {
           >
             <p className="text-sm text-gray-500 dark:text-gray-400">
               Precisa de ajuda?{" "}
-              <Link href="/contact" className="text-blue-600 dark:text-blue-400 hover:underline">
+              <Link href="#" className="text-blue-600 dark:text-blue-400 hover:underline">
                 Contate nosso suporte
               </Link>
             </p>

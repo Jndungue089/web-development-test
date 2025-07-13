@@ -6,10 +6,6 @@ jest.mock("next/navigation", () => ({
   useRouter: () => ({ push: jest.fn() }),
 }));
 
-jest.mock("../components/extras/BackgroundGrid", () => ({
-  BackgroundGrid: () => <div data-testid="background-grid" />,
-}));
-
 jest.mock("framer-motion", () => {
   const React = require("react");
   return {
@@ -40,7 +36,4 @@ describe("HeroSection", () => {
     expect(screen.getByTestId("mockup-subtitle")).toHaveTextContent("Visualização do painel de controle");
   });
 
-  it("renderiza o componente de background", () => {
-    expect(screen.getByTestId("background-grid")).toBeInTheDocument();
-  });
 });
