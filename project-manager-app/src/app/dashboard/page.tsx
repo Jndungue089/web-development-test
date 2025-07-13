@@ -1,19 +1,22 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
-import { collection, onSnapshot, updateDoc, doc, Timestamp, serverTimestamp, addDoc } from "firebase/firestore";
-import { db, auth } from "@/firebase/config";
-import { useAuthState } from "react-firebase-hooks/auth";
+import { collection, onSnapshot, updateDoc, doc } from "firebase/firestore";
+import { db } from "@/firebase/config";
 import { DndProvider, useDrag, useDrop } from "react-dnd";
 import { HTML5Backend } from "react-dnd-html5-backend";
 import { toast } from "sonner";
 import { motion, AnimatePresence } from "framer-motion";
-import { FiPlus, FiMoreVertical, FiCheck, FiClock, FiPlay, FiArchive, FiPieChart, FiTrendingUp, FiAlertTriangle } from "react-icons/fi";
-import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { FiPlus, FiMoreVertical, FiCheck, FiClock, FiPlay, FiArchive } from "react-icons/fi";
 import { Chart as ChartJS, ArcElement, BarElement, CategoryScale, LinearScale, Tooltip, Legend } from "chart.js";
-import { Pie, Bar } from "react-chartjs-2";
+import ActionConfirmDialog from "@/components/ActionConfirmDialog";
+import DeleteDropZone from "./DeleteDropZone";
+import ProjectCardBase from "@/components/ProjectCardBase";
+import DashboardStats from "@/components/DashboardStats";
+import ArchiveDropZone from "@/components/ArchiveDropZone";
 
 ChartJS.register(ArcElement, BarElement, CategoryScale, LinearScale, Tooltip, Legend);
+import Link from "next/link";
+import { toDateSafe } from "@/utils/dateUtils";
 
 // Tipos para o projeto
 type Project = {
@@ -21,146 +24,14 @@ type Project = {
   title: string;
   description: string;
   status: "TO_DO" | "IN_PROGRESS" | "DONE";
-  createdAt: Date;
-  priority: "low" | "medium" | "high";
-  startDate: Date;
-  endDate: Date;
-  owner: string;
-  members: string[];
-  role: "Owner" | "Participant";
+  createdAt?: Date;
+  priority?: "low" | "medium" | "high";
+  role?: "Owner" | "Participant";
 };
-
-type Notification = {
-  projectId: string;
-  recipientEmail: string;
-  read: boolean;
-  message: string;
-  type: "status_update" | "deadline" | "priority_change" | "new_member";
-  createdAt: Timestamp;
-};
-
-// Componente: Card de Estatística
-const StatCard = ({ icon, title, value, trend, color }: { icon: React.ReactNode; title: string; value: string | number; trend?: string; color: string }) => (
-  <motion.div
-    initial={{ opacity: 0, y: 10 }}
-    animate={{ opacity: 1, y: 0 }}
-    transition={{ duration: 0.3 }}
-    className={`bg-white dark:bg-gray-800 rounded-xl p-4 shadow-sm border border-gray-200 dark:border-gray-700 ${color}`}
-  >
-    <div className="flex items-center justify-between">
-      <div>
-        <p className="text-sm font-medium text-gray-500 dark:text-gray-400">{title}</p>
-        <h3 className="text-2xl font-bold mt-1 dark:text-white">{value}</h3>
-      </div>
-      <div className={`p-3 rounded-lg bg-opacity-20 ${color}`}>
-        {icon}
-      </div>
-    </div>
-    {trend && (
-      <div className="mt-2 flex items-center text-sm">
-        <span className={`${trend.startsWith('+') ? 'text-green-500' : 'text-red-500'} flex items-center`}>
-          {trend.startsWith('+') ? '↑' : '↓'} {trend}
-        </span>
-        <span className="text-gray-500 dark:text-gray-400 ml-1">vs último mês</span>
-      </div>
-    )}
-  </motion.div>
-);
 
 // Componente: Card de Projeto Draggable
-const ProjectCard = ({ project, moveProject, updatePriority }: { project: Project; moveProject: (id: string, newStatus: Project["status"]) => void; updatePriority: (id: string, newPriority: Project["priority"]) => void }) => {
-  const [{ isDragging }, drag] = useDrag(() => ({
-    type: "PROJECT",
-    item: { id: project.id, status: project.status },
-    collect: (monitor) => ({
-      isDragging: monitor.isDragging(),
-    }),
-  }));
-
-  const ref = useRef<HTMLDivElement>(null);
-  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
-
-  drag(ref);
-
-  const priorityColors = {
-    low: "bg-green-100 text-green-800",
-    medium: "bg-yellow-100 text-yellow-800",
-    high: "bg-red-100 text-red-800",
-  };
-
-  const handlePriorityChange = async (newPriority: Project["priority"]) => {
-    if (newPriority && newPriority !== project.priority) {
-      await updatePriority(project.id, newPriority);
-      setIsDropdownOpen(false);
-    }
-  };
-
-  return (
-    <motion.div
-      ref={ref}
-      initial={{ opacity: 0, y: 10 }}
-      animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, scale: 0.95 }}
-      whileHover={{ scale: 1.02 }}
-      whileTap={{ scale: 0.98 }}
-      transition={{ type: "spring", stiffness: 400, damping: 17 }}
-      className={`relative group rounded-lg shadow-sm border border-gray-200 bg-white dark:bg-gray-800 dark:border-gray-700 overflow-hidden transition-all ${isDragging ? "opacity-70 shadow-lg rotate-1" : ""
-        }`}
-    >
-      <Link href={`/dashboard/projects/${project.id}`} className="block p-4">
-        <div className="flex justify-between items-start">
-          <h3 className="font-semibold text-gray-900 dark:text-white line-clamp-1">
-            {project.title || "Sem título"}
-          </h3>
-          <div className="flex items-center gap-2">
-            <span className="text-xs px-2 py-1 rounded-full bg-blue-100 text-blue-800">
-              {project.role === "Owner" ? "Criador(a)" : "Participante"}
-            </span>
-            {project.priority && (
-              <span className={`text-xs px-2 py-1 rounded-full ${priorityColors[project.priority]}`}>
-                {project.priority === "high" ? "Alta" : project.priority === "medium" ? "Média" : "Baixa"}
-              </span>
-            )}
-          </div>
-        </div>
-        <p className="mt-2 text-sm text-gray-600 dark:text-gray-400 line-clamp-2">
-          {project.description || "Sem descrição"}
-        </p>
-      </Link>
-
-      <div className="px-4 pb-3 flex justify-between items-center text-xs text-gray-500 dark:text-gray-400">
-        <span>
-          {project.createdAt?.toLocaleDateString("pt-BR", {
-            day: "2-digit",
-            month: "short",
-          })}
-        </span>
-        <div className="relative">
-          <button
-            onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-            className="opacity-0 group-hover:opacity-100 transition-opacity text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
-          >
-            <FiMoreVertical size={16} />
-          </button>
-          {isDropdownOpen && (
-            <div className="absolute right-0 mt-2 w-32 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-md shadow-lg z-10">
-              <div className="py-1">
-                {["low", "medium", "high"].map((priority) => (
-                  <button
-                    key={priority}
-                    onClick={() => handlePriorityChange(priority as Project["priority"])}
-                    className="block w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700"
-                  >
-                    {priority === "high" ? "Alta" : priority === "medium" ? "Média" : "Baixa"}
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
-      </div>
-    </motion.div>
-  );
+const ProjectCard = ({ project, moveProject, userRole, isAdmin }: { project: Project; moveProject: (id: string, newStatus: Project["status"], archive?: boolean, remove?: boolean) => void; userRole?: string; isAdmin?: boolean }) => {
+  return <ProjectCardBase project={{ ...project, role: userRole === "Owner" || userRole === "Participant" ? userRole : undefined, isAdmin }} moveProject={moveProject} />;
 };
 
 // Componente: Coluna Drop Zone
@@ -168,13 +39,12 @@ const ProjectColumn = ({
   status,
   projects,
   moveProject,
-  updatePriority,
 }: {
   status: Project["status"];
   projects: Project[];
   moveProject: (id: string, newStatus: Project["status"]) => void;
-  updatePriority: (id: string, newPriority: Project["priority"]) => void;
 }) => {
+  const ref = useRef<HTMLDivElement | null>(null);
   const [{ isOver }, drop] = useDrop(() => ({
     accept: "PROJECT",
     drop: (item: { id: string; status: Project["status"] }) => {
@@ -187,11 +57,12 @@ const ProjectColumn = ({
     }),
   }));
 
-  const ref = useRef<HTMLDivElement>(null);
-  drop(ref);
+  useEffect(() => {
+    if (ref.current) drop(ref.current);
+  }, [ref, drop]);
 
   const statusConfig = {
-    TO_DO: { icon: <FiClock className="text-blue-500" />, title: "Por Fazer", color: "bg-blue-100 dark:bg-blue-900/30" },
+    TO_DO: { icon: <FiClock className="text-blue-500" />, title: "A Fazer", color: "bg-blue-100 dark:bg-blue-900/30" },
     IN_PROGRESS: { icon: <FiPlay className="text-yellow-500" />, title: "Em Progresso", color: "bg-yellow-100 dark:bg-yellow-900/30" },
     DONE: { icon: <FiCheck className="text-green-500" />, title: "Concluído", color: "bg-green-100 dark:bg-green-900/30" },
   };
@@ -205,19 +76,27 @@ const ProjectColumn = ({
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.3 }}
-      className={`flex-1 rounded-xl p-4 transition-colors ${isOver ? "bg-gray-100/50 dark:bg-gray-700/50" : ""}`}
+      className={`flex-1 rounded-xl p-4 transition-colors ${isOver ? "bg-gray-100/50 dark:bg-gray-700/50" : ""
+        }`}
     >
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center space-x-2">
           <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${statusConfig[status].color}`}>
             {statusConfig[status].icon}
           </div>
-          <h2 className="font-semibold text-gray-900 dark:text-white">{statusConfig[status].title}</h2>
+          <h2 className="font-semibold text-gray-900 dark:text-white">
+            {statusConfig[status].title}
+          </h2>
         </div>
-        <span className="text-xs font-medium px-2 py-1 rounded-full bg-gray-200 dark:bg-gray-700">{count}</span>
+        <span className="text-xs font-medium px-2 py-1 rounded-full bg-gray-200 dark:bg-gray-700">
+          {count}
+        </span>
       </div>
 
-      <motion.div layout className="space-y-3 min-h-[100px]">
+      <motion.div
+        layout
+        className="space-y-3 min-h-[100px]"
+      >
         <AnimatePresence>
           {filteredProjects.map((project) => (
             <motion.div
@@ -228,7 +107,7 @@ const ProjectColumn = ({
               exit={{ opacity: 0 }}
               transition={{ type: "spring", stiffness: 500, damping: 30 }}
             >
-              <ProjectCard project={project} moveProject={moveProject} updatePriority={updatePriority} />
+              <ProjectCard project={project} moveProject={moveProject} userRole={project.role} isAdmin={/* lógica para admin */ false} />
             </motion.div>
           ))}
         </AnimatePresence>
@@ -240,7 +119,9 @@ const ProjectColumn = ({
             className="flex flex-col items-center justify-center py-8 text-center"
           >
             <FiArchive className="text-gray-400 mb-2" size={24} />
-            <p className="text-sm text-gray-500 dark:text-gray-400">Nenhum projeto nesta coluna</p>
+            <p className="text-sm text-gray-500 dark:text-gray-400">
+              Nenhum projeto nesta coluna
+            </p>
           </motion.div>
         )}
       </motion.div>
@@ -251,157 +132,103 @@ const ProjectColumn = ({
 export default function DashboardPage() {
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
-  const [user, loadingAuth] = useAuthState(auth);
-  const router = useRouter();
+  const [archivedProjects, setArchivedProjects] = useState<Project[]>([]);
+  const [isOverArchive, setIsOverArchive] = useState(false);
+  const [confirmArchive, setConfirmArchive] = useState<{ id: string; open: boolean } | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState<{ id: string; name: string; open: boolean } | null>(null);
 
   useEffect(() => {
-    if (loadingAuth) return;
-    if (!user) {
-      router.push("/auth/login");
-      return;
-    }
-
     const unsubscribe = onSnapshot(collection(db, "projects"), (snapshot) => {
-      const projectsData: any = snapshot.docs
-        .map((doc) => {
-          const data = doc.data();
-          const validStatus = ["TO_DO", "IN_PROGRESS", "DONE"].includes(data.status) ? data.status : "TO_DO";
-          const parseDate = (date: any): Date | undefined => {
-            if (date instanceof Timestamp) return date.toDate();
-            if (typeof date === "string" && date) return new Date(date);
-            return undefined;
-          };
-          const priority = ["low", "medium", "high"].includes(data.priority) ? data.priority : undefined;
-          const isOwner = data.owner === user.uid;
-          const isMember = (data.members || []).includes(user.email); // Alterado para verificar por email
-          const role = isOwner ? "Owner" : isMember ? "Participant" : null;
-
-          if (!role) return null;
-
-          return {
-            id: doc.id,
-            title: data.title || "",
-            description: data.description || "",
-            status: validStatus as Project["status"],
-            priority,
-            createdAt: parseDate(data.createdAt),
-            startDate: parseDate(data.startDate),
-            endDate: parseDate(data.endDate),
-            owner: data.owner || "",
-            members: data.members || [],
-            role: role as "Owner" | "Participant",
-          };
-        })
-        .filter((project): project is Project => project !== null);
-      setProjects(projectsData);
+      const allProjects = snapshot.docs.map((doc) => {
+        const data = doc.data();
+        // Supondo que userId e userEmail estejam disponíveis
+        const userId = "userId"; // Substitua pelo id do usuário autenticado
+        const userEmail = "userEmail"; // Substitua pelo email do usuário autenticado
+        const isOwner = data.owner === userId;
+        const isMember = (data.members || []).includes(userEmail);
+        const role: "Owner" | "Participant" | undefined = isOwner ? "Owner" : isMember ? "Participant" : undefined;
+        return {
+          id: doc.id,
+          title: data.title || "",
+          description: data.description || "",
+          status: data.status || "TO_DO",
+          priority: data.priority || "medium",
+          createdAt: toDateSafe(data.createdAt),
+          archived: !!data.archived,
+          role,
+        };
+      });
+      setProjects(allProjects.filter(p => !p.archived));
+      setArchivedProjects(allProjects.filter(p => p.archived));
       setLoading(false);
     });
 
     return () => unsubscribe();
-  }, [user, loadingAuth, router]);
+  }, []);
 
-  const moveProject = async (id: string, newStatus: Project["status"]) => {
+  const moveProject = async (id: string, newStatus: Project["status"], archive = false, remove = false) => {
+    if (archive) {
+      setConfirmArchive({ id, open: true });
+      return;
+    }
+    if (remove) {
+      const project = projects.find(p => p.id === id);
+      if (project) setConfirmDelete({ id, name: project.title, open: true });
+      return;
+    }
     try {
       const projectRef = doc(db, "projects", id);
       await updateDoc(projectRef, { status: newStatus });
-
-      const project = projects.find(p => p.id === id);
-      if (project) {
-        await createStatusUpdateNotification(project, newStatus);
-      }
-
-      toast.success(`Status atualizado para ${newStatus === "TO_DO" ? "Por Fazer" : newStatus === "IN_PROGRESS" ? "Em Progresso" : "Concluído"}`);
+      toast.success(`Status atualizado para ${newStatus === "TO_DO" ? "A Fazer" : newStatus === "IN_PROGRESS" ? "Em Progresso" : "Concluído"}`);
     } catch (error) {
       toast.error("Erro ao atualizar o projeto");
       console.error("Error moving project:", error);
     }
   };
 
-  const updatePriority = async (id: string, newPriority: Project["priority"]) => {
+  const handleArchiveConfirm = async () => {
+    if (!confirmArchive) return;
     try {
-      const projectRef = doc(db, "projects", id);
-      await updateDoc(projectRef, { priority: newPriority });
-
-      const project = projects.find(p => p.id === id);
-      if (project) {
-        await createPriorityChangeNotification(project, newPriority);
-      }
-
-      toast.success(`Prioridade atualizada para ${newPriority === "high" ? "Alta" : newPriority === "medium" ? "Média" : "Baixa"}`);
+      const projectRef = doc(db, "projects", confirmArchive.id);
+      await updateDoc(projectRef, { archived: true });
+      toast.success("Projeto arquivado!");
     } catch (error) {
-      toast.error("Erro ao atualizar prioridade");
-      console.error("Error updating priority:", error);
+      toast.error("Erro ao arquivar o projeto");
     }
+    setConfirmArchive(null);
   };
 
-  // Calcular estatísticas
+  const handleDeleteConfirm = async (id: string) => {
+    try {
+      await import("firebase/firestore").then(({ doc, deleteDoc }) => deleteDoc(doc(db, "projects", id)));
+      toast.success("Projeto removido!");
+    } catch (error) {
+      toast.error("Erro ao remover o projeto");
+    }
+    setConfirmDelete(null);
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-screen">
+        <div className="animate-pulse text-gray-500">Carregando projetos...</div>
+      </div>
+    );
+  }
+
+  // Estatísticas
   const stats = {
     totalProjects: projects.length,
     completed: projects.filter((p) => p.status === "DONE").length,
     inProgress: projects.filter((p) => p.status === "IN_PROGRESS").length,
     overdue: projects.filter((p) => {
-      if (p.status !== "DONE" && p.endDate) {
-        return new Date() > p.endDate;
+      if (p.status !== "DONE" && p.createdAt) {
+        return new Date() > p.createdAt;
       }
       return false;
     }).length,
     completionRate: projects.length > 0 ? Math.round((projects.filter((p) => p.status === "DONE").length / projects.length) * 100) : 0,
     highPriority: projects.filter((p) => p.priority === "high").length,
-  };
-
-  const createStatusUpdateNotification = async (project: Project, newStatus: string) => {
-    const statusMessages = {
-      "TO_DO": "foi movido para 'Por Fazer'",
-      "IN_PROGRESS": "foi movido para 'Em Progresso'",
-      "DONE": "foi concluído"
-    };
-
-    const notifications = project.members
-      .filter(email => email !== user?.email)
-      .map(async (email) => {
-        try {
-          await addDoc(collection(db, "notifications"), {
-            projectId: project.id,
-            recipientEmail: email,
-            read: false,
-            message: `O projeto "${project.title}" ${statusMessages[newStatus as keyof typeof statusMessages]}`,
-            type: "status_update",
-            createdAt: serverTimestamp(),
-          });
-        } catch (error) {
-          console.error(`Error creating notification for ${email}:`, error);
-        }
-      });
-
-    await Promise.all(notifications);
-  };
-
-
-  const createPriorityChangeNotification = async (project: Project, newPriority: string) => {
-    const priorityNames = {
-      "low": "baixa",
-      "medium": "média",
-      "high": "alta"
-    };
-
-    const notifications = project.members
-      .filter(email => email !== user?.email)
-      .map(async (email) => {
-        try {
-          await addDoc(collection(db, "notifications"), {
-            projectId: project.id,
-            recipientEmail: email,
-            read: false,
-            message: `A prioridade do projeto "${project.title}" foi alterada para ${priorityNames[newPriority as keyof typeof priorityNames]}`,
-            type: "priority_change",
-            createdAt: serverTimestamp(),
-          });
-        } catch (error) {
-          console.error(`Error creating notification for ${email}:`, error);
-        }
-      });
-
-    await Promise.all(notifications);
   };
 
   // Dados para o gráfico de Progresso Mensal
@@ -413,27 +240,15 @@ export default function DashboardPage() {
       return {
         month: date.toLocaleString("pt-BR", { month: "short" }),
         completed: projects.filter((p) => {
-          if (p.status === "DONE" && p.endDate instanceof Date && !isNaN(p.endDate.getTime())) {
-            const endMonth = p.endDate.getMonth();
-            const endYear = p.endDate.getFullYear();
+          if (p.status === "DONE" && p.createdAt instanceof Date && !isNaN(p.createdAt.getTime())) {
+            const endMonth = p.createdAt.getMonth();
+            const endYear = p.createdAt.getFullYear();
             return endMonth === date.getMonth() && endYear === date.getFullYear();
           }
           return false;
         }).length,
       };
     });
-
-  if (loading || loadingAuth) {
-    return (
-      <div className="flex items-center justify-center h-screen">
-        <div className="animate-pulse text-gray-500">Carregando projetos...</div>
-      </div>
-    );
-  }
-
-  if (!user) {
-    return null;
-  }
 
   return (
     <DndProvider backend={HTML5Backend}>
@@ -455,115 +270,85 @@ export default function DashboardPage() {
             <span>Novo Projeto</span>
           </Link>
         </div>
-
-        {/* Seção de Estatísticas */}
-        <motion.section initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.2 }}>
-          <h2 className="text-xl font-semibold mb-4 dark:text-white">Visão Geral</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-            <StatCard
-              icon={<FiPieChart className="text-blue-500" size={20} />}
-              title="Total de Projetos"
-              value={stats.totalProjects}
-              trend="+12%"
-              color="bg-blue-50 dark:bg-blue-900/20"
-            />
-            <StatCard
-              icon={<FiCheck className="text-green-500" size={20} />}
-              title="Concluídos"
-              value={stats.completed}
-              color="bg-green-50 dark:bg-green-900/20"
-            />
-            <StatCard
-              icon={<FiPlay className="text-yellow-500" size={20} />}
-              title="Em Progresso"
-              value={stats.inProgress}
-              color="bg-yellow-50 dark:bg-green-900/20"
-            />
-            <StatCard
-              icon={<FiAlertTriangle className="text-red-500" size={20} />}
-              title="Atrasados"
-              value={stats.overdue}
-              color="bg-red-50 dark:bg-red-900/20"
-            />
-          </div>
-
-          {/* Gráficos */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-8">
-            <div className="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-sm border border-gray-200 dark:border-gray-700">
-              <h3 className="font-medium mb-3 dark:text-white">Distribuição por Status</h3>
-              <div className="h-64">
-                <Pie
-                  data={{
-                    labels: ["Por Fazer", "Em Progresso", "Concluído"],
-                    datasets: [
-                      {
-                        data: [
-                          projects.filter((p) => p.status === "TO_DO").length,
-                          projects.filter((p) => p.status === "IN_PROGRESS").length,
-                          projects.filter((p) => p.status === "DONE").length,
-                        ],
-                        backgroundColor: ["#3B82F6", "#FBBF24", "#10B981"],
-                        borderColor: ["#2563EB", "#D97706", "#059669"],
-                        borderWidth: 1,
-                      },
-                    ],
-                  }}
-                  options={{
-                    maintainAspectRatio: false,
-                    plugins: {
-                      legend: { position: "top" },
-                    },
-                  }}
-                />
-              </div>
-            </div>
-            <div className="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-sm border border-gray-200 dark:border-gray-700">
-              <h3 className="font-medium mb-3 dark:text-white">Progresso Mensal</h3>
-              <div className="h-64">
-                <Bar
-                  data={{
-                    labels: monthlyData.map((d) => d.month),
-                    datasets: [
-                      {
-                        label: "Projetos Concluídos",
-                        data: monthlyData.map((d) => d.completed),
-                        backgroundColor: "#10B981",
-                        borderColor: "#059669",
-                        borderWidth: 1,
-                      },
-                    ],
-                  }}
-                  options={{
-                    maintainAspectRatio: false,
-                    scales: {
-                      y: {
-                        beginAtZero: true,
-                        title: { display: true, text: "Projetos Concluídos" },
-                      },
-                      x: {
-                        title: { display: true, text: "Mês" },
-                      },
-                    },
-                    plugins: {
-                      legend: { display: false },
-                    },
-                  }}
-                />
-              </div>
-            </div>
-          </div>
-        </motion.section>
-
+        {/* Estatísticas e gráficos */}
+        <DashboardStats stats={stats} monthlyData={monthlyData} />
+        {/* Área de deletar projeto (lado esquerdo) */}
+        <div className="fixed left-0 top-1/2 -translate-y-1/2 z-40">
+          <DeleteDropZone
+            projects={projects}
+            setConfirmDelete={setConfirmDelete}
+          />
+        </div>
         {/* Seção do Kanban */}
-        <motion.section initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.4 }}>
-          <h2 className="text-xl font-semibold mb-4 dark:text-white">Quadro de Projetos</h2>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <ProjectColumn status="TO_DO" projects={projects} moveProject={moveProject} updatePriority={updatePriority} />
-            <ProjectColumn status="IN_PROGRESS" projects={projects} moveProject={moveProject} updatePriority={updatePriority} />
-            <ProjectColumn status="DONE" projects={projects} moveProject={moveProject} updatePriority={updatePriority} />
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <ProjectColumn status="TO_DO" projects={projects} moveProject={moveProject} />
+          <ProjectColumn status="IN_PROGRESS" projects={projects} moveProject={moveProject} />
+          <ProjectColumn status="DONE" projects={projects} moveProject={moveProject} />
+        </div>
+        {/* Área de Arquivação */}
+        {projects.length > 0 && (
+          <ArchiveDropZone
+            isOver={isOverArchive}
+            setIsOver={setIsOverArchive}
+            onDrop={async (id: string) => {
+              setConfirmArchive({ id, open: true });
+            }}
+          />
+        )}
+        {/* Botão para ver projetos arquivados */}
+        {archivedProjects.length > 0 && (
+          <div className="flex justify-center mt-6">
+            <Link href="/dashboard/projects/archived" className="px-4 py-2 bg-gray-700 text-white rounded-lg hover:bg-gray-800 transition">
+              Ver Projetos Arquivados
+            </Link>
           </div>
-        </motion.section>
+        )}
+        {/* Diálogo de confirmação de arquivação */}
+        <ActionConfirmDialog
+          open={!!confirmArchive?.open}
+          title="Arquivar Projeto"
+          description="Tem certeza que deseja arquivar este projeto?"
+          confirmLabel="Arquivar"
+          onConfirm={handleArchiveConfirm}
+          onCancel={() => setConfirmArchive(null)}
+        />
+        {/* Diálogo de confirmação de remoção */}
+        <ActionConfirmDialog
+          open={!!confirmDelete?.open}
+          title={`Remover Projeto`}
+          description={`Tem a certeza que deseja remover o projeto ${confirmDelete?.name}?\nDigite 'delete ${confirmDelete?.name}' para confirmar.`}
+          confirmLabel="Remover"
+          confirmText={confirmDelete ? `delete ${confirmDelete.name}` : undefined}
+          onConfirm={() => confirmDelete && handleDeleteConfirm(confirmDelete.id)}
+          onCancel={() => setConfirmDelete(null)}
+        />
       </div>
     </DndProvider>
   );
 }
+
+// Card de Estatística para indicadores
+const StatCard = ({ icon, title, value, trend, color }: { icon: React.ReactNode; title: string; value: string | number; trend?: string; color: string }) => (
+  <motion.div
+    initial={{ opacity: 0, y: 10 }}
+    animate={{ opacity: 1, y: 0 }}
+    transition={{ duration: 0.3 }}
+    className={`bg-white dark:bg-gray-800 rounded-xl p-4 shadow-sm border border-gray-200 dark:border-gray-700 ${color}`}
+  >
+    <div className="flex items-center justify-between">
+      <div>
+        <p className="text-sm font-medium text-gray-500 dark:text-gray-400">{title}</p>
+        <h3 className="text-2xl font-bold mt-1 dark:text-white">{value}</h3>
+      </div>
+      <div className={`p-3 rounded-lg bg-opacity-20 ${color}`}>{icon}</div>
+    </div>
+    {trend && (
+      <div className="mt-2 flex items-center text-sm">
+        <span className={`${trend.startsWith('+') ? 'text-green-500' : 'text-red-500'} flex items-center`}>
+          {trend.startsWith('+') ? '↑' : '↓'} {trend}
+        </span>
+        <span className="text-gray-500 dark:text-gray-400 ml-1">vs último mês</span>
+      </div>
+    )}
+  </motion.div>
+);

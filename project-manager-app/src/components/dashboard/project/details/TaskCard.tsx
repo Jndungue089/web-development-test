@@ -3,6 +3,8 @@ import { useDrag } from "react-dnd";
 import { motion } from "framer-motion";
 import { FiAlertTriangle, FiCalendar, FiUser } from "react-icons/fi";
 import { Task } from "@/types/project";
+import { format } from "path";
+import { formatDatePT } from "@/utils/dateUtils";
 
 interface TaskCardProps {
   task: Task;
@@ -65,7 +67,7 @@ export default function TaskCard({ task, onClick, onStatusChange }: TaskCardProp
         <div className="flex items-center text-xs text-gray-500 dark:text-gray-400 mt-2">
           <FiCalendar className="mr-1 flex-shrink-0" size={12} />
           <span className="truncate">
-            Prazo: {new Date(task.dueDate).toLocaleDateString()}
+            Prazo: {formatDatePT(task.dueDate)}
           </span>
         </div>
       )}

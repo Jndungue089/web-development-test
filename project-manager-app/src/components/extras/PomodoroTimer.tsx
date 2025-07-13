@@ -1,5 +1,6 @@
 "use client";
 import { useState, useEffect, useRef } from "react";
+// Adiciona intensidade de foco e popup
 import { FiCheck, FiMinimize, FiX } from "react-icons/fi";
 import { doc, updateDoc, arrayUnion, serverTimestamp } from "firebase/firestore";
 import { db, auth } from "@/firebase/config";
@@ -29,6 +30,8 @@ const PomodoroTimer = ({
 }: PomodoroTimerProps) => {
     const [user] = useAuthState(auth);
     const [minutes, setMinutes] = useState<number>(25);
+    const [focusLevel, setFocusLevel] = useState<'leve' | 'moderado' | 'intenso'>('moderado');
+    // Removido modo popup
     const [seconds, setSeconds] = useState<number>(0);
     const [isActive, setIsActive] = useState<boolean>(false);
     const [mode, setMode] = useState<PomodoroMode>("focus");
@@ -37,10 +40,13 @@ const PomodoroTimer = ({
     const [showTaskSelector, setShowTaskSelector] = useState<boolean>(true);
     const [isMinimized, setIsMinimized] = useState(false);
     const intervalRef = useRef<NodeJS.Timeout | null>(null);
+    // Removido BroadcastChannel
 
     // Settings
     const settings = {
-        focus: 25,
+        leve: 15,
+        moderado: 25,
+        intenso: 40,
         shortBreak: 5,
         longBreak: 15,
         longBreakInterval: 4
@@ -56,7 +62,9 @@ const PomodoroTimer = ({
         return () => {
             if (intervalRef.current) clearInterval(intervalRef.current);
         };
-    }, [mode]);
+    }, [mode, focusLevel]);
+
+    // Removido BroadcastChannel
 
 
     // Update timer
@@ -67,11 +75,11 @@ const PomodoroTimer = ({
                     if (minutes === 0) {
                         timerComplete();
                     } else {
-                        setMinutes(minutes - 1);
+                        setMinutes((prev) => prev - 1);
                         setSeconds(59);
                     }
                 } else {
-                    setSeconds(seconds - 1);
+                    setSeconds((prev) => prev - 1);
                 }
             }, 1000);
         } else if (intervalRef.current) {
@@ -97,7 +105,7 @@ const PomodoroTimer = ({
                         pomodoroSessions: arrayUnion({
                             date: serverTimestamp(),
                             userId: user.uid,
-                            duration: settings.focus
+                            duration: settings[focusLevel]
                         })
                     });
                 } catch (error) {
@@ -125,7 +133,7 @@ const PomodoroTimer = ({
     const resetTimer = () => {
         switch (mode) {
             case "focus":
-                setMinutes(settings.focus);
+                setMinutes(settings[focusLevel]);
                 break;
             case "shortBreak":
                 setMinutes(settings.shortBreak);
@@ -187,97 +195,113 @@ const PomodoroTimer = ({
         });
     };
 
-
+    // ...existing code...
     return (
-        <div className={`bg-white dark:bg-gray-800 rounded-lg md:rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 p-4 sm:p-6 w-full max-w-md mx-auto`}>
-            {showTaskSelector ? (
-                <div className="space-y-3 sm:space-y-4">
-                    <h3 className="text-base sm:text-lg font-semibold dark:text-white">Selecione uma tarefa para focar</h3>
-                    {incompleteTasks.length > 0 ? (
-                        <div className="space-y-2 max-h-60 overflow-y-auto">
-                            {incompleteTasks.map(task => (
-                                <button
-                                    key={task.id}
-                                    onClick={() => handleTaskSelect(task)}
-                                    className="w-full p-2 sm:p-3 text-left rounded-lg bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 transition text-sm sm:text-base"
-                                >
-                                    <span className="line-clamp-1">{task.title}</span>
-                                </button>
-                            ))}
-                        </div>
-                    ) : (
-                        <p className="text-gray-500 dark:text-gray-400 text-sm sm:text-base">Nenhuma tarefa pendente</p>
-                    )}
-                </div>
-            ) : (
-                <>
-                    <div className="flex justify-between items-start mb-3 sm:mb-4">
-                        <div className="max-w-[80%]">
-                            <h3 className="font-medium text-gray-700 dark:text-gray-300 text-xs sm:text-sm">Tarefa atual:</h3>
-                            <p className="text-base sm:text-lg font-semibold dark:text-white truncate">{selectedTask?.title}</p>
-                        </div>
-                        <button
-                            onClick={() => {
-                                setSelectedTask(null);
-                                setShowTaskSelector(true);
-                            }}
-                            className="p-1 sm:p-2 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700 transition"
-                        >
-                            <FiX className="text-gray-500 dark:text-gray-400" size={16} />
-                        </button>
-                    </div>
-
-                    <div className="flex flex-col items-center space-y-3 sm:space-y-4">
-                        {/* Mode and timer */}
-                        <div className="text-center">
-                            <span className={`px-2 sm:px-3 py-1 rounded-full text-xs sm:text-sm font-medium ${mode === "focus"
-                                    ? "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400"
-                                    : "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400"
-                                }`}>
-                                {getModeLabel()}
-                            </span>
-                            <div className="text-4xl sm:text-5xl font-bold my-3 sm:my-4 dark:text-white">
-                                {formatTime()}
+        <>
+            {/* Configuração de intensidade de foco */}
+            <div className="mb-4 flex gap-2 items-center">
+                <label className="font-medium text-sm dark:text-white">Intensidade:</label>
+                <select
+                    value={focusLevel}
+                    onChange={e => setFocusLevel(e.target.value as 'leve' | 'moderado' | 'intenso')}
+                    className="rounded px-2 py-1 border dark:bg-gray-800 dark:text-white"
+                >
+                    <option value="leve">Leve (15 min)</option>
+                    <option value="moderado">Moderado (25 min)</option>
+                    <option value="intenso">Intenso (40 min)</option>
+                </select>
+            </div>
+            {/* Removido botão de abrir popup */}
+            <div className={`bg-white dark:bg-gray-800 rounded-lg md:rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 p-4 sm:p-6 w-full max-w-md mx-auto`}>
+                {showTaskSelector ? (
+                    <div className="space-y-3 sm:space-y-4">
+                        <h3 className="text-base sm:text-lg font-semibold dark:text-white">Selecione uma tarefa para focar</h3>
+                        {incompleteTasks.length > 0 ? (
+                            <div className="space-y-2 max-h-60 overflow-y-auto">
+                                {incompleteTasks.map(task => (
+                                    <button
+                                        key={task.id}
+                                        onClick={() => handleTaskSelect(task)}
+                                        className="w-full p-2 sm:p-3 text-left rounded-lg bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 transition text-sm sm:text-base"
+                                    >
+                                        <span className="line-clamp-1">{task.title}</span>
+                                    </button>
+                                ))}
                             </div>
-                        </div>
-
-                        {/* Main controls */}
-                        <PomodoroControls
-                            isActive={isActive}
-                            onToggle={toggleTimer}
-                            onReset={handleReset}
-                        />
-
-                        {/* Task complete button */}
-                        {mode === "focus" && (
-                            <button
-                                onClick={handleTaskComplete}
-                                className="flex items-center gap-2 px-3 sm:px-4 py-1.5 sm:py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition text-sm sm:text-base"
-                            >
-                                <FiCheck size={14} className="flex-shrink-0" />
-                                <span className="whitespace-nowrap">Marcar como concluída</span>
-                            </button>
-                        )}
-
-                        {/* Pomodoro counter */}
-                        <PomodoroCounter
-                            completed={completedPomodoros}
-                            total={settings.longBreakInterval}
-                        />
-
-                        {/* Next break info */}
-                        {mode === "focus" && (
-                            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 sm:mt-2 text-center">
-                                {settings.longBreakInterval - (completedPomodoros % settings.longBreakInterval) === 1
-                                    ? "Pausa longa no próximo ciclo"
-                                    : `Pausa longa em ${settings.longBreakInterval - (completedPomodoros % settings.longBreakInterval)
-                                    } ciclos`}
-                            </p>
+                        ) : (
+                            <p className="text-gray-500 dark:text-gray-400 text-sm sm:text-base">Nenhuma tarefa pendente</p>
                         )}
                     </div>
-                </>
-            )}
-        </div>
+                ) : (
+                    <>
+                        <div className="flex justify-between items-start mb-3 sm:mb-4">
+                            <div className="max-w-[80%]">
+                                <h3 className="font-medium text-gray-700 dark:text-gray-300 text-xs sm:text-sm">Tarefa atual:</h3>
+                                <p className="text-base sm:text-lg font-semibold dark:text-white truncate">{selectedTask?.title}</p>
+                            </div>
+                            <button
+                                onClick={() => {
+                                    setSelectedTask(null);
+                                    setShowTaskSelector(true);
+                                }}
+                                className="p-1 sm:p-2 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700 transition"
+                            >
+                                <FiX className="text-gray-500 dark:text-gray-400" size={16} />
+                            </button>
+                        </div>
+
+                        <div className="flex flex-col items-center space-y-3 sm:space-y-4">
+                            {/* Mode and timer */}
+                            <div className="text-center">
+                                <span className={`px-2 sm:px-3 py-1 rounded-full text-xs sm:text-sm font-medium ${mode === "focus"
+                                        ? "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400"
+                                        : "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400"
+                                    }`}>
+                                    {getModeLabel()}
+                                </span>
+                                <div className="text-4xl sm:text-5xl font-bold my-3 sm:my-4 dark:text-white">
+                                    {formatTime()}
+                                </div>
+                            </div>
+
+                            {/* Main controls */}
+                            <PomodoroControls
+                                isActive={isActive}
+                                onToggle={toggleTimer}
+                                onReset={handleReset}
+                            />
+
+                            {/* Task complete button */}
+                            {mode === "focus" && (
+                                <button
+                                    onClick={handleTaskComplete}
+                                    className="flex items-center gap-2 px-3 sm:px-4 py-1.5 sm:py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition text-sm sm:text-base"
+                                >
+                                    <FiCheck size={14} className="flex-shrink-0" />
+                                    <span className="whitespace-nowrap">Marcar como concluída</span>
+                                </button>
+                            )}
+
+                            {/* Pomodoro counter */}
+                            <PomodoroCounter
+                                completed={completedPomodoros}
+                                total={settings.longBreakInterval}
+                            />
+
+                            {/* Next break info */}
+                            {mode === "focus" && (
+                                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 sm:mt-2 text-center">
+                                    {settings.longBreakInterval - (completedPomodoros % settings.longBreakInterval) === 1
+                                        ? "Pausa longa no próximo ciclo"
+                                        : `Pausa longa em ${settings.longBreakInterval - (completedPomodoros % settings.longBreakInterval)
+                                        } ciclos`}
+                                </p>
+                            )}
+                        </div>
+                    </>
+                )}
+            </div>
+        </>
     );
 };
 

@@ -5,6 +5,7 @@ import { collection, doc, addDoc, onSnapshot, Timestamp, getDoc } from "firebase
 import { db, auth } from "@/firebase/config";
 import { useAuthState } from "react-firebase-hooks/auth";
 import { toast } from "sonner";
+import { formatDatePT } from "@/utils/dateUtils";
 
 type CommentsSectionProps = {
   projectId: string;
@@ -195,7 +196,7 @@ export default function CommentsSection({ projectId, taskId, isNewTask }: Commen
                     <span className="font-medium">{comment.author}</span>
                     <span className="flex items-center text-xs text-gray-500 dark:text-gray-400">
                       <FiClock className="mr-1" />
-                      {comment.createdAt?.toDate().toLocaleString()}
+                      {comment.createdAt ? formatDatePT(comment.createdAt) : "Data desconhecida"}
                     </span>
                   </div>
                   <p className="mt-1 text-sm whitespace-pre-wrap">{comment.text}</p>

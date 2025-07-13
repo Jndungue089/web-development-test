@@ -24,7 +24,7 @@ export default function ProjectPomodoro({ projectId, tasks }: ProjectPomodoroPro
       <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow border border-gray-200 dark:border-gray-700">
         <h3 className="font-medium mb-4 dark:text-white">Como usar o Pomodoro</h3>
         <ul className="list-disc pl-5 space-y-2 text-gray-700 dark:text-gray-300">
-          <li>Trabalhe por 25 minutos (foco)</li>
+          <li>Trabalhe por 15-45 minutos (foco)</li>
           <li>Faça uma pausa curta de 5 minutos</li>
           <li>A cada 4 ciclos, faça uma pausa longa de 15-30 minutos</li>
           <li>O timer salva automaticamente as sessões completadas na tarefa atual</li>

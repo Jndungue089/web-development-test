@@ -5,14 +5,20 @@ import { FiSun, FiMoon } from "react-icons/fi";
 
 export function ThemeToggle() {
   const [mounted, setMounted] = useState(false);
-  const [theme, setTheme] = useState<"light" | "dark">(() => {
-    if (typeof window !== "undefined") {
-      return document.documentElement.classList.contains("dark") ? "dark" : "light";
-    }
-    return "light";
-  });
+  const [theme, setTheme] = useState<"light" | "dark">("light");
 
   useEffect(() => {
+    // Inicializa tema antes do mount
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem("theme");
+      if (saved === "dark") {
+        document.documentElement.classList.add("dark");
+        setTheme("dark");
+      } else {
+        document.documentElement.classList.remove("dark");
+        setTheme("light");
+      }
+    }
     setMounted(true);
   }, []);
 
@@ -27,13 +33,19 @@ export function ThemeToggle() {
     }
   }, [theme, mounted]);
 
+  // Sincroniza tema entre abas
   useEffect(() => {
-    if (typeof window !== "undefined") {
-      const saved = localStorage.getItem("theme");
-      if (saved === "dark") setTheme("dark");
-      if (saved === "light") setTheme("light");
-    }
+    if (typeof window === "undefined") return;
+    const handler = (e: StorageEvent) => {
+      if (e.key === "theme" && (e.newValue === "dark" || e.newValue === "light")) {
+        setTheme(e.newValue as "light" | "dark");
+      }
+    };
+    window.addEventListener("storage", handler);
+    return () => window.removeEventListener("storage", handler);
   }, []);
+
+  // Removido useEffect duplicado
 
   if (!mounted) return null;
 

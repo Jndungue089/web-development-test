@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { FiCalendar, FiEdit, FiTrash2 } from "react-icons/fi";
 import { Project } from "@/types/project";
+import { formatDatePT } from "@/utils/dateUtils";
 
 
 interface ProjectHeaderProps {
@@ -18,8 +19,7 @@ export default function ProjectHeader({ project, onDelete, canEdit, canDelete }:
         <div className="flex items-center text-sm text-gray-500 dark:text-gray-400 mt-1">
           <FiCalendar className="mr-1" />
           <span>
-            {project.startDate?.toDate().toLocaleDateString("pt-PT")} -{" "}
-            {project.endDate?.toDate().toLocaleDateString("pt-PT")}
+            {formatDatePT(project.startDate)} - {formatDatePT(project.endDate)}
           </span>
         </div>
       </div>

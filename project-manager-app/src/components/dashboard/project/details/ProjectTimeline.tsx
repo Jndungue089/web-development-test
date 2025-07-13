@@ -1,5 +1,6 @@
 import { FiCalendar } from "react-icons/fi";
 import { Project, Task } from "@/types/project";
+import { formatDatePT } from "@/utils/dateUtils";
 
 interface ProjectTimelineProps {
   project: Project;
@@ -26,11 +27,7 @@ export default function ProjectTimeline({ project, tasks }: ProjectTimelineProps
             <div className="min-w-0">
               <h4 className="font-medium dark:text-white text-sm sm:text-base">Início do Projeto</h4>
               <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">
-                {project.startDate?.toDate().toLocaleDateString("pt-PT", {
-                  day: "2-digit",
-                  month: "long",
-                  year: "numeric",
-                })}
+                {formatDatePT(project.startDate)}
               </p>
             </div>
           </div>
@@ -43,11 +40,7 @@ export default function ProjectTimeline({ project, tasks }: ProjectTimelineProps
             <div className="min-w-0">
               <h4 className="font-medium dark:text-white text-sm sm:text-base">Prazo Final</h4>
               <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">
-                {project.endDate?.toDate().toLocaleDateString("pt-PT", {
-                  day: "2-digit",
-                  month: "long",
-                  year: "numeric",
-                })}
+                {formatDatePT(project.endDate)}
               </p>
             </div>
           </div>

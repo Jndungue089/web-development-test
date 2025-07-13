@@ -2,6 +2,7 @@
 import { useEffect, useState } from "react";
 import { collection, getDocs, orderBy, query, onSnapshot } from "firebase/firestore";
 import { db } from "@/firebase/config";
+import { formatDatePT } from "@/utils/dateUtils";
 
 interface Comment {
   id: string;
@@ -58,7 +59,7 @@ export default function CommentList({ projectId, taskId, refresh }: CommentListP
         <div key={comment.id} className="p-3 bg-gray-50 rounded-lg">
           <p className="text-sm text-gray-800">{comment.text}</p>
           <p className="text-xs text-gray-500 mt-1">
-            {comment.createdAt?.toDate()?.toLocaleString() || "Data desconhecida"}
+            {comment.createdAt ? formatDatePT(comment.createdAt) : "Data desconhecida"}
           </p>
         </div>
       ))}
