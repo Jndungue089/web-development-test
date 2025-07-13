@@ -1,4 +1,4 @@
-import { useRef, useEffect } from "react";
+import { useRef, useEffect, useState } from "react";
 import { useDrag } from "react-dnd";
 import Link from "next/link";
 import { FiMoreVertical } from "react-icons/fi";
@@ -9,7 +9,7 @@ const priorityColors: Record<"low" | "medium" | "high", string> = {
   high: "bg-red-100 text-red-800",
 };
 
-type Project = {
+export type Project = {
   id: string;
   title: string;
   description: string;
@@ -22,7 +22,13 @@ type Project = {
 
 type MoveProjectFn = (id: string, newStatus: "TO_DO" | "IN_PROGRESS" | "DONE", archive?: boolean, remove?: boolean) => void;
 
-export default function ProjectCardBase({ project, moveProject }: { project: Project; moveProject: MoveProjectFn }) {
+
+interface ProjectCardBaseProps {
+  project: Project;
+  moveProject: MoveProjectFn;
+}
+
+export default function ProjectCardBase({ project, moveProject }: ProjectCardBaseProps) {
   const ref = useRef<HTMLDivElement | null>(null);
   const [{ isDragging }, drag] = useDrag(() => ({
     type: "PROJECT",
@@ -37,6 +43,7 @@ export default function ProjectCardBase({ project, moveProject }: { project: Pro
 
   const isAdmin = !!project.isAdmin;
   const isOwner = project.role === "Owner";
+  const [actionLoading, setActionLoading] = useState<string | null>(null);
 
   return (
     <div
@@ -73,19 +80,43 @@ export default function ProjectCardBase({ project, moveProject }: { project: Pro
       {(isAdmin || isOwner) && (
         <div className="flex md:hidden gap-2 px-4 pb-3 flex-wrap">
           <button
-            className="px-2 py-1 text-xs rounded bg-blue-100 text-blue-800 hover:bg-blue-200"
-            onClick={() => moveProject(project.id, project.status, true)}
-          >Arquivar</button>
+            className="px-2 py-1 text-xs rounded bg-blue-100 text-blue-800 hover:bg-blue-200 flex items-center gap-1"
+            disabled={actionLoading === "archive"}
+            onClick={async () => {
+              setActionLoading("archive");
+              await moveProject(project.id, project.status, true);
+              setActionLoading(null);
+            }}
+          >
+            {actionLoading === "archive" ? <span className="animate-spin">↻</span> : null}
+            Arquivar
+          </button>
           <button
-            className="px-2 py-1 text-xs rounded bg-red-100 text-red-800 hover:bg-red-200"
-            onClick={() => moveProject(project.id, project.status, false, true)}
-          >Remover</button>
+            className="px-2 py-1 text-xs rounded bg-red-100 text-red-800 hover:bg-red-200 flex items-center gap-1"
+            disabled={actionLoading === "remove"}
+            onClick={async () => {
+              setActionLoading("remove");
+              await moveProject(project.id, project.status, false, true);
+              setActionLoading(null);
+            }}
+          >
+            {actionLoading === "remove" ? <span className="animate-spin">↻</span> : null}
+            Remover
+          </button>
           {["TO_DO", "IN_PROGRESS", "DONE"].filter(s => s !== project.status).map((s) => (
             <button
               key={s}
-              className="px-2 py-1 text-xs rounded bg-gray-100 text-gray-800 hover:bg-gray-200"
-              onClick={() => moveProject(project.id, s as "TO_DO" | "IN_PROGRESS" | "DONE")}
-            >{s === "TO_DO" ? "A Fazer" : s === "IN_PROGRESS" ? "Em Progresso" : "Concluído"}</button>
+              className="px-2 py-1 text-xs rounded bg-gray-100 text-gray-800 hover:bg-gray-200 flex items-center gap-1"
+              disabled={actionLoading === s}
+              onClick={async () => {
+                setActionLoading(s);
+                await moveProject(project.id, s as "TO_DO" | "IN_PROGRESS" | "DONE");
+                setActionLoading(null);
+              }}
+            >
+              {actionLoading === s ? <span className="animate-spin">↻</span> : null}
+              {s === "TO_DO" ? "A Fazer" : s === "IN_PROGRESS" ? "Em Progresso" : "Concluído"}
+            </button>
           ))}
         </div>
       )}

@@ -16,7 +16,9 @@ import ArchiveDropZone from "@/components/ArchiveDropZone";
 
 ChartJS.register(ArcElement, BarElement, CategoryScale, LinearScale, Tooltip, Legend);
 import Link from "next/link";
+import { exportProjectsToCSV, exportProjectsToPDF } from "@/utils/exportUtils";
 import { toDateSafe } from "@/utils/dateUtils";
+import { useAuth } from "@/context/AuthContext";
 
 // Tipos para o projeto
 type Project = {
@@ -130,23 +132,26 @@ const ProjectColumn = ({
 };
 
 export default function DashboardPage() {
+  const { user, loading: loadingAuth } = useAuth();
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
   const [archivedProjects, setArchivedProjects] = useState<Project[]>([]);
   const [isOverArchive, setIsOverArchive] = useState(false);
   const [confirmArchive, setConfirmArchive] = useState<{ id: string; open: boolean } | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<{ id: string; name: string; open: boolean } | null>(null);
+  const [showReport, setShowReport] = useState(false);
 
   useEffect(() => {
+    if (loadingAuth) return;
     const unsubscribe = onSnapshot(collection(db, "projects"), (snapshot) => {
       const allProjects = snapshot.docs.map((doc) => {
         const data = doc.data();
-        // Supondo que userId e userEmail estejam disponíveis
-        const userId = "userId"; // Substitua pelo id do usuário autenticado
-        const userEmail = "userEmail"; // Substitua pelo email do usuário autenticado
-        const isOwner = data.owner === userId;
-        const isMember = (data.members || []).includes(userEmail);
+        let userId = user?.uid;
+        let userEmail = user?.email;
+        const isOwner = userId ? data.owner === userId : false;
+        const isMember = userEmail ? (data.members || []).includes(userEmail) : false;
         const role: "Owner" | "Participant" | undefined = isOwner ? "Owner" : isMember ? "Participant" : undefined;
+        const isAdmin = isOwner;
         const createdAt = toDateSafe(data.createdAt);
         return {
           id: doc.id,
@@ -157,15 +162,15 @@ export default function DashboardPage() {
           createdAt: createdAt === null ? undefined : createdAt,
           archived: !!data.archived,
           role,
+          isAdmin,
         };
       });
       setProjects(allProjects.filter(p => !p.archived));
       setArchivedProjects(allProjects.filter(p => p.archived));
       setLoading(false);
     });
-
     return () => unsubscribe();
-  }, []);
+  }, [user, loadingAuth]);
 
   const moveProject = async (id: string, newStatus: Project["status"], archive = false, remove = false) => {
     if (archive) {
@@ -209,7 +214,7 @@ export default function DashboardPage() {
     setConfirmDelete(null);
   };
 
-  if (loading) {
+  if (loading || loadingAuth) {
     return (
       <div className="flex items-center justify-center h-screen">
         <div className="animate-pulse text-gray-500">Carregando projetos...</div>
@@ -273,11 +278,36 @@ export default function DashboardPage() {
         </div>
         {/* Estatísticas e gráficos */}
         <DashboardStats stats={stats} monthlyData={monthlyData} />
+        {/* Botões de exportação e relatório */}
+        <div className="flex flex-wrap gap-4 items-center justify-end mt-2">
+          <button
+            className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition"
+            aria-label="Exportar projetos para CSV"
+            onClick={() => exportProjectsToCSV(projects)}
+          >
+            Exportar CSV
+          </button>
+          <button
+            className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition"
+            aria-label="Exportar projetos para PDF"
+            onClick={() => exportProjectsToPDF(projects)}
+          >
+            Exportar PDF
+          </button>
+          <button
+            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
+            aria-label="Ver relatório de produtividade"
+            onClick={() => setShowReport(true)}
+          >
+            Relatório de Produtividade
+          </button>
+        </div>
         {/* Área de deletar projeto (lado esquerdo) */}
         <div className="fixed left-0 top-1/2 -translate-y-1/2 z-40">
           <DeleteDropZone
             projects={projects}
             setConfirmDelete={setConfirmDelete}
+            canDelete={user && (user.uid || "") ? true : false}
           />
         </div>
         {/* Seção do Kanban */}
@@ -294,6 +324,7 @@ export default function DashboardPage() {
             onDrop={async (id: string) => {
               setConfirmArchive({ id, open: true });
             }}
+            canArchive={user && (user.uid || "") ? true : false}
           />
         )}
         {/* Botão para ver projetos arquivados */}
@@ -302,6 +333,33 @@ export default function DashboardPage() {
             <Link href="/dashboard/projects/archived" className="px-4 py-2 bg-gray-700 text-white rounded-lg hover:bg-gray-800 transition">
               Ver Projetos Arquivados
             </Link>
+          </div>
+        )}
+        {/* Modal de relatório de produtividade */}
+        {showReport && (
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40"
+            role="dialog"
+            aria-modal="true"
+          >
+            <div className="bg-white dark:bg-gray-900 rounded-xl p-8 max-w-lg w-full shadow-lg relative">
+              <h2 className="text-xl font-bold mb-4 text-gray-900 dark:text-white">Relatório de Produtividade</h2>
+              <ul className="space-y-2 mb-4">
+                <li>Projetos totais: <b>{stats.totalProjects}</b></li>
+                <li>Concluídos: <b>{stats.completed}</b></li>
+                <li>Em progresso: <b>{stats.inProgress}</b></li>
+                <li>Atrasados: <b>{stats.overdue}</b></li>
+                <li>Taxa de conclusão: <b>{stats.completionRate}%</b></li>
+                <li>Alta prioridade: <b>{stats.highPriority}</b></li>
+              </ul>
+              <button
+                className="absolute top-2 right-2 text-gray-500 hover:text-gray-700 dark:hover:text-gray-300"
+                aria-label="Fechar relatório"
+                onClick={() => setShowReport(false)}
+              >
+                Fechar
+              </button>
+            </div>
           </div>
         )}
         {/* Diálogo de confirmação de arquivação */}

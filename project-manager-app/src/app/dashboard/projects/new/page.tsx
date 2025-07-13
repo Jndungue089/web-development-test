@@ -105,63 +105,63 @@ export default function ProjectFormPage() {
   };
 
   const handleAddMember = async () => {
-  const email = emailInput.trim();
-  if (!email) return;
+    const email = emailInput.trim();
+    if (!email) return;
 
-  // Verificar duplicação
-  if (formData.members.includes(email)) {
-    toast.error("Este email já foi adicionado");
-    return;
-  }
-
-  // Validar formato do email
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-    toast.error("Por favor, insira um email válido");
-    return;
-  }
-
-  setIsSearching(true);
-
-  try {
-    const auth = getAuth();
-    const db = getFirestore();
-
-    let userExists = false;
-
-    // 🔍 1. Verificar se existe no Auth
-    const signInMethods = await fetchSignInMethodsForEmail(auth, email);
-    if (signInMethods.length > 0) {
-      userExists = true;
+    // Verificar duplicação
+    if (formData.members.includes(email)) {
+      toast.error("Este email já foi adicionado");
+      return;
     }
 
-    // 🔍 2. Verificar se existe na coleção "users"
-    if (!userExists) {
-      const usersRef = collection(db, "users");
-      const q = query(usersRef, where("email", "==", email));
-      const querySnapshot = await getDocs(q);
+    // Validar formato do email
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      toast.error("Por favor, insira um email válido");
+      return;
+    }
 
-      if (!querySnapshot.empty) {
+    setIsSearching(true);
+
+    try {
+      const auth = getAuth();
+      const db = getFirestore();
+
+      let userExists = false;
+
+      // 🔍 1. Verificar se existe no Auth
+      const signInMethods = await fetchSignInMethodsForEmail(auth, email);
+      if (signInMethods.length > 0) {
         userExists = true;
       }
-    }
 
-    if (userExists) {
-      setFormData((prev) => ({
-        ...prev,
-        members: [...prev.members, email],
-      }));
-      setEmailInput("");
-      toast.success(`Usuário ${email} adicionado com sucesso`);
-    } else {
-      toast.error("Usuário não encontrado");
+      // 🔍 2. Verificar se existe na coleção "users"
+      if (!userExists) {
+        const usersRef = collection(db, "users");
+        const q = query(usersRef, where("email", "==", email));
+        const querySnapshot = await getDocs(q);
+
+        if (!querySnapshot.empty) {
+          userExists = true;
+        }
+      }
+
+      if (userExists) {
+        setFormData((prev) => ({
+          ...prev,
+          members: [...prev.members, email],
+        }));
+        setEmailInput("");
+        toast.success(`Usuário ${email} adicionado com sucesso`);
+      } else {
+        toast.error("Usuário não encontrado");
+      }
+    } catch (error) {
+      console.error("Erro ao verificar o email:", error);
+      toast.error("Erro ao verificar o email");
+    } finally {
+      setIsSearching(false);
     }
-  } catch (error) {
-    console.error("Erro ao verificar o email:", error);
-    toast.error("Erro ao verificar o email");
-  } finally {
-    setIsSearching(false);
-  }
-};
+  };
 
   const removeMember = (email: string) => {
     setFormData(prev => ({
@@ -425,7 +425,7 @@ export default function ProjectFormPage() {
               <FiUser size={16} />
               Membros
             </label>
-            
+
             <div className="flex flex-col sm:flex-row gap-2">
               <input
                 id="members"
@@ -439,8 +439,9 @@ export default function ProjectFormPage() {
                 type="button"
                 onClick={handleAddMember}
                 disabled={isSearching}
-                className="px-4 py-2 sm:py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
+                className="px-4 py-2 sm:py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 flex items-center gap-2"
               >
+                {isSearching ? <span className="animate-spin">↻</span> : null}
                 {isSearching ? "Verificando..." : "Adicionar"}
               </button>
             </div>
@@ -459,10 +460,11 @@ export default function ProjectFormPage() {
                       <button
                         type="button"
                         onClick={() => removeMember(member)}
-                        className="ml-1 text-blue-500 hover:text-blue-700 dark:hover:text-blue-300"
+                        className="ml-1 text-blue-500 hover:text-blue-700 dark:hover:text-blue-300 flex items-center"
                         aria-label={`Remover ${member}`}
+                        disabled={loading}
                       >
-                        <X size={12} />
+                        {loading ? <span className="animate-spin">↻</span> : <X size={12} />}
                       </button>
                     </div>
                   ))}
