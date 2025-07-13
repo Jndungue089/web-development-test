@@ -9,19 +9,22 @@ import { HTML5Backend } from "react-dnd-html5-backend";
 import dynamic from "next/dynamic";
 import { AnimatePresence } from "framer-motion";
 import { Project, Task, ProjectStats } from "@/types/project";
-import ProjectHeader from "@/components/dashboard/project/details/ProjectHeader";
+import  ProjectHeader  from "@/components/dashboard/project/details/ProjectHeader";
 import ProjectMembers from "@/components/dashboard/project/details/ProjectMembers";
 import ProjectNav from "@/components/dashboard/project/details/ProjectNav";
 import ProjectOverview from "@/components/dashboard/project/details/ProjectOverview";
 import ProjectPomodoro from "@/components/dashboard/project/details/ProjectPomodoro";
 import ProjectTasks from "@/components/dashboard/project/details/ProjectTasks";
 import ProjectTimeline from "@/components/dashboard/project/details/ProjectTimeline";
+import { useAuthState } from "react-firebase-hooks/auth";
+import { auth } from "@/firebase/config";
 
 
 const TaskModal = dynamic(() => import("./TaskModal"), { ssr: false });
 
-export default function ProjectDetailPage({ params }: { params: { id: string } }) {
+export default function ProjectDetailPage() {
   const { id } = useParams();
+  const [user] = useAuthState(auth);
   const router = useRouter();
   const [project, setProject] = useState<Project | null>(null);
   const [tasks, setTasks] = useState<Task[]>([]);
@@ -85,8 +88,15 @@ export default function ProjectDetailPage({ params }: { params: { id: string } }
     highPriorityTasks: tasks.filter((t) => t.priority === "high").length,
   };
 
+  // Permissão: só owner pode excluir projeto
+  const canEditProject = user && project && (user.uid === project.owner || project.members.includes(user.uid));
+  const canDeleteProject = user && project && (user.uid === project.owner);
+
   const handleDeleteProject = async () => {
-    if (!id) return;
+    if (!id || !canDeleteProject) {
+      toast.error("Você não tem permissão para excluir este projeto.");
+      return;
+    }
     if (!confirm("Tem certeza que deseja excluir este projeto e todas as suas tarefas?")) return;
 
     try {
@@ -142,7 +152,7 @@ export default function ProjectDetailPage({ params }: { params: { id: string } }
   return (
     <DndProvider backend={HTML5Backend}>
       <div className="max-w-7xl mx-auto p-6">
-        <ProjectHeader project={project} onDelete={handleDeleteProject} />
+        <ProjectHeader project={project} onDelete={canDeleteProject ? handleDeleteProject : () => {}} canEdit={!!canEditProject} canDelete={!!canDeleteProject} />
         <ProjectNav
           activeTab={activeTab}
           setActiveTab={setActiveTab}

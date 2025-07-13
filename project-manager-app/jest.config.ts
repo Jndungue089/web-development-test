@@ -4,7 +4,7 @@ const config: Config = {
   preset: "ts-jest",
   testEnvironment: "jsdom",
   transform: {
-    "^.+\\.(ts|tsx)$": "ts-jest",
+    "^.+\\.(ts|tsx|js|jsx)$": "babel-jest"
   },
   moduleNameMapper: {
     "^@/(.*)$": "<rootDir>/src/$1",
@@ -12,7 +12,8 @@ const config: Config = {
   },
   setupFilesAfterEnv: ["<rootDir>/jest.setup.ts"],
   testPathIgnorePatterns: ["/node_modules/", "/.next/"],
-  transformIgnorePatterns: ["<rootDir>/node_modules/(?!react-icons|framer-motion)"],
+  // Permitir que Jest transforme pacotes ESM como react-dnd
+  transformIgnorePatterns: ["<rootDir>/node_modules/(?!react-dnd|react-dnd-html5-backend|react-icons|framer-motion)"]
 };
 
 export default config;
