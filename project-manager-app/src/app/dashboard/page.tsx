@@ -147,13 +147,14 @@ export default function DashboardPage() {
         const isOwner = data.owner === userId;
         const isMember = (data.members || []).includes(userEmail);
         const role: "Owner" | "Participant" | undefined = isOwner ? "Owner" : isMember ? "Participant" : undefined;
+        const createdAt = toDateSafe(data.createdAt);
         return {
           id: doc.id,
           title: data.title || "",
           description: data.description || "",
           status: data.status || "TO_DO",
           priority: data.priority || "medium",
-          createdAt: toDateSafe(data.createdAt),
+          createdAt: createdAt === null ? undefined : createdAt,
           archived: !!data.archived,
           role,
         };
